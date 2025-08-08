@@ -1,0 +1,6 @@
+@ChatNest.API_HostAddress = http://localhost:5069
+
+GET {{ChatNest.API_HostAddress}}
+Accept: application/json
+
+###
