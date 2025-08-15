@@ -15,7 +15,7 @@ namespace ChatNest.Shared.DTOs.Request
 
         [Required(ErrorMessage = "Lütfen bir mesaj giriniz.")]
         public string Content { get; init; }
-
-        public string? FileName { get; init; }
+        public byte[]? File { get; set; }
+        public string? FileName { get; set; }
     }
 }

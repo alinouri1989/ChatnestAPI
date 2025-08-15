@@ -1,10 +1,7 @@
-﻿using Firebase.Database;
+﻿using ChatNest.Services.Abstract;
+using ChatNest.Services.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using ChatNest.Entities.Models;
-using ChatNest.Services.Abstract;
-using ChatNest.Services.Concrete;
-using ChatNest.Services.Exceptions;
 using System.Security.Claims;
 
 namespace ChatNest.API.Hubs
@@ -62,7 +59,7 @@ namespace ChatNest.API.Hubs
             await base.OnConnectedAsync();
         }
 
-        
+
 
         /// <summary>
         /// Kullanıcı bağlantısını kestiğinde çağrılır. Kullanıcının son bağlantı tarihini günceller ve diğer kullanıcılara bildirir.

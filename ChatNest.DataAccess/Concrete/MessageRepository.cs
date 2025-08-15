@@ -1,72 +1,113 @@
-﻿using Firebase.Database;
-using Firebase.Database.Query;
-using Microsoft.Extensions.Options;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Configurations;
+﻿using ChatNest.DataAccess.Abstract;
+using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatNest.DataAccess.Concrete
 {
-    /// <summary>
-    /// Mesajlarla (Message) ilgili veritabanı işlemlerini gerçekleştiren repository sınıfı.
-    /// </summary>
     public sealed class MessageRepository : IMessageRepository
     {
-        private readonly FirebaseClient _databaseClient;
+        private readonly ChatNestDbContext _context;
 
-
-
-        /// <summary>
-        /// <see cref="MessageRepository"/> sınıfının yeni bir örneğini başlatır.
-        /// </summary>
-        /// <param name="firebaseConfig">Firebase yapılandırma ayarlarını içeren nesne.</param>
-        public MessageRepository(FirebaseConfig firebaseConfig)
+        public MessageRepository(ChatNestDbContext context)
         {
-            _databaseClient = firebaseConfig.DatabaseClient;
+            _context = context;
         }
 
-
-
-        /// <summary>
-        /// Belirtilen kullanıcı kimliği, sohbet türü ve sohbet kimliğine göre yeni bir mesaj oluşturur.
-        /// </summary>
-        /// <param name="userId">Mesajı gönderen kullanıcının kimliği.</param>
-        /// <param name="chatType">Sohbet türü (bireysel, grup vb.).</param>
-        /// <param name="chatId">Sohbetin kimliği.</param>
-        /// <param name="messageId">Mesajın kimliği.</param>
-        /// <param name="message">Oluşturulacak mesaj nesnesi.</param>
-        public async Task CreateMessageAsync(string userId, string chatType, string chatId, string messageId, Message message)
+        public async Task CreateMessageAsync(Message message)
         {
-            await _databaseClient.Child("Chats").Child(chatType).Child(chatId).Child("Messages").Child(messageId).PutAsync(message);
+            if (message.Id == Guid.Empty)
+                message.Id = Guid.NewGuid();
+
+            message.CreatedDate = DateTime.UtcNow;
+
+            _context.Messages.Add(message);
+            await _context.SaveChangesAsync();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbet türü, sohbet kimliği ve mesaj kimliğine göre mesajın kimler için silindiğini günceller.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbetin kimliği.</param>
-        /// <param name="messageId">Mesajın kimliği.</param>
-        /// <param name="deletedFor">Mesajı silen kullanıcıların kimlikleri ve silme zamanlarını içeren sözlük.</param>
-        public async Task UpdateMessageDeletedForAsync(string chatType, string chatId, string messageId, Dictionary<string, DateTime> deletedFor)
+        public async Task UpdateMessageDeletedForAsync(Guid messageId, Dictionary<string, DateTime> deletedFor)
         {
-            await _databaseClient.Child("Chats").Child(chatType).Child(chatId).Child("Messages").Child(messageId).Child("DeletedFor").PutAsync(deletedFor);
+            var message = await _context.Messages.FindAsync(messageId);
+            if (message != null)
+            {
+                message.DeletedFor = deletedFor;
+                await _context.SaveChangesAsync();
+            }
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbet türü, sohbet kimliği ve mesaj kimliğine göre mesajın durumunu günceller.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbetin kimliği.</param>
-        /// <param name="messageId">Mesajın kimliği.</param>
-        /// <param name="fieldName">Güncellenecek durum alanının adı.</param>
-        /// <param name="fieldData">Güncellenecek veri.</param>
-        public async Task UpdateMessageStatusAsync(string chatType, string chatId, string messageId, string fieldName, object fieldData)
+        public async Task UpdateMessageStatusAsync(Guid messageId, string fieldName, Dictionary<string, DateTime> fieldData)
         {
-            await _databaseClient.Child("Chats").Child(chatType).Child(chatId).Child("Messages").Child(messageId).Child("Status").Child(fieldName).PutAsync(fieldData);
+            var message = await _context.Messages.FindAsync(messageId);
+            if (message != null)
+            {
+                if (fieldName == "Delivered")
+                {
+                    foreach (var kvp in fieldData)
+                    {
+                        message.Status.Delivered[kvp.Key] = kvp.Value;
+                    }
+                }
+                else if (fieldName == "Read")
+                {
+                    foreach (var kvp in fieldData)
+                    {
+                        message.Status.Read[kvp.Key] = kvp.Value;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<Message?> GetMessageByIdAsync(Guid messageId)
+        {
+            return await _context.Messages
+                .Include(m => m.Sender)
+                .FirstOrDefaultAsync(m => m.Id == messageId);
+        }
+
+        public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 50)
+        {
+            return await _context.Messages
+                .Where(m => m.ChatId == chatId)
+                .Include(m => m.Sender)
+                .OrderByDescending(m => m.CreatedDate)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync();
+        }
+
+        public async Task UpdateMessageAsync(Message message)
+        {
+            _context.Messages.Update(message);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> DeleteMessageAsync(Guid messageId)
+        {
+            var message = await _context.Messages.FindAsync(messageId);
+            if (message != null)
+            {
+                _context.Messages.Remove(message);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<IEnumerable<Message>> SearchMessagesAsync(string searchTerm, Guid? chatId = null)
+        {
+            var query = _context.Messages.Where(m => m.Content.Contains(searchTerm));
+
+            if (chatId.HasValue)
+            {
+                query = query.Where(m => m.ChatId == chatId.Value);
+            }
+
+            return await query
+                .Include(m => m.Sender)
+                .OrderByDescending(m => m.CreatedDate)
+                .ToListAsync();
         }
     }
 }

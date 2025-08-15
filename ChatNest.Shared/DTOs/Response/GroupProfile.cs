@@ -14,5 +14,8 @@
         public required Dictionary<string, ParticipantProfile> Participants { get; init; }
 
         public required DateTime CreatedDate { get; init; }
+
+        public string Id { get; set; } = string.Empty;
+        public long CreatedBy { get; set; }
     }
 }

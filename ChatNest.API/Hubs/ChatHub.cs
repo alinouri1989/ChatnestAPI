@@ -1,12 +1,9 @@
-﻿using Firebase.Database;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.SignalR;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.Entities.Models;
+﻿using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
-using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 
 namespace ChatNest.API.Hubs
@@ -18,20 +15,17 @@ namespace ChatNest.API.Hubs
     [Authorize]
     public sealed class ChatHub : Hub
     {
-        private readonly IMessageRepository _messageRepository;
         private readonly IMessageService _messageService;
         private readonly IGroupService _groupService;
         private readonly IChatService _chatService;
         private readonly IUserService _userService;
-
-
 
         /// <summary>
         /// Geçerli kullanıcının kimliğini (UserId) döndürür.
         /// Kullanıcının kimliği, JWT içindeki <see cref="ClaimTypes.NameIdentifier"/> değerinden alınır.
         /// </summary>
         /// <returns>Geçerli kullanıcının benzersiz kimliği.</returns>
-        /// <exception cref="NullReferenceException">
+        /// <exception cref="UnauthorizedAccessException">
         /// Eğer kullanıcı kimliği bulunamazsa veya bir null değer ile karşılaşılırsa fırlatılır.
         /// </exception>
         private string UserId
@@ -39,32 +33,29 @@ namespace ChatNest.API.Hubs
             get
             {
                 var identity = Context?.User?.Identity as ClaimsIdentity;
-                return identity?
-                    .FindFirst(ClaimTypes.NameIdentifier)?
-                    .Value!;
+                var userId = identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrEmpty(userId))
+                    throw new UnauthorizedAccessException("User ID not found in token");
+
+                return userId;
             }
         }
-
-
 
         /// <summary>
         /// <see cref="ChatHub"/> sınıfının yeni bir örneğini oluşturur.
         /// </summary>
-        /// <param name="messageRepository">Mesaj işlemleri için <see cref="IMessageRepository"/> bağımlılığı.</param>
         /// <param name="messageService">Mesaj işlemleri için <see cref="IMessageService"/> bağımlılığı.</param>
         /// <param name="groupService">Grup işlemleri için <see cref="IGroupService"/> bağımlılığı.</param>
         /// <param name="chatService">Sohbet işlemleri için <see cref="IChatService"/> bağımlılığı.</param>
         /// <param name="userService">Kullanıcı işlemleri için <see cref="IUserService"/> bağımlılığı.</param>
-        public ChatHub(IMessageRepository messageRepository, IMessageService messageService, IGroupService groupService, IChatService chatService, IUserService userService)
+        public ChatHub(IMessageService messageService, IGroupService groupService, IChatService chatService, IUserService userService)
         {
-            _messageRepository = messageRepository;
             _messageService = messageService;
             _groupService = groupService;
             _chatService = chatService;
             _userService = userService;
         }
-
-
 
         /// <summary>
         /// Kullanıcı hub'a bağlandığında tetiklenen metod.
@@ -73,10 +64,16 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
         public override async Task OnConnectedAsync()
         {
-            await base.OnConnectedAsync();
+            try
+            {
+                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.UtcNow);
+                await base.OnConnectedAsync();
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("ConnectionError", new { message = "Bağlantı hatası oluştu!", errorDetails = ex.Message });
+            }
         }
-
-
 
         /// <summary>
         /// Kullanıcı hub'dan ayrıldığında tetiklenen metod.
@@ -85,10 +82,20 @@ namespace ChatNest.API.Hubs
         /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            await base.OnDisconnectedAsync(exception);
+            try
+            {
+                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception but don't send to client since they're disconnecting
+                Console.WriteLine($"Error updating last connection date: {ex.Message}");
+            }
+            finally
+            {
+                await base.OnDisconnectedAsync(exception);
+            }
         }
-
-
 
         /// <summary>
         /// Kullanıcının tüm sohbetlerini, alıcı profillerini ve grup profillerini yükler ve istemciye iletir.
@@ -99,8 +106,7 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                var chatsTask = _chatService.GetAllChatsAsync(UserId);
-                var (chats, chatsRecipientIds, userGroupIds) = await chatsTask;
+                var (chats, chatsRecipientIds, userGroupIds) = await _chatService.GetAllChatsAsync(UserId);
 
                 var recipientProfilesTask = _userService.GetRecipientProfilesAsync(chatsRecipientIds);
                 var groupProfilesTask = _groupService.GetGroupProfilesAsync(userGroupIds);
@@ -108,22 +114,15 @@ namespace ChatNest.API.Hubs
                 var recipientProfiles = await recipientProfilesTask;
                 var groupProfiles = await groupProfilesTask;
 
-                var sendTasks = new[]
-                {
-                    Clients.Caller.SendAsync("ReceiveInitialChats", chats),
-                    Clients.Caller.SendAsync("ReceiveInitialGroupProfiles", groupProfiles),
-                    Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", recipientProfiles),
-                };
-
-                await Task.WhenAll(sendTasks);
+                await Clients.Caller.SendAsync("ReceiveInitialChats", chats);
+                await Clients.Caller.SendAsync("ReceiveInitialGroupProfiles", groupProfiles);
+                await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", recipientProfiles);
             }
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
             }
         }
-
-
 
         /// <summary>
         /// Yeni bir sohbet başlatır ve katılımcılara sohbet bilgilerini iletir.
@@ -141,35 +140,46 @@ namespace ChatNest.API.Hubs
             {
                 var chat = await _chatService.CreateChatAsync(UserId, chatType, recipientId);
 
-                if (chatType.Equals("Individual"))
+                if (chatType.Equals("Individual", StringComparison.OrdinalIgnoreCase))
                 {
-                    var chatParticipants = chat.Values.Select(x => x.Participants).First();
-
-                    foreach (var participant in chatParticipants)
+                    var chatEntity = chat.Values.FirstOrDefault();
+                    if (chatEntity != null)
                     {
-                        await Clients.User(participant).SendAsync("ReceiveCreateChat", new Dictionary<string, Dictionary<string, Chat>> { { "Individual", chat } });
-                    }
+                        var chatParticipants = chatEntity.Participants;
 
-                    var recipientProfiles = await _userService.GetRecipientProfilesAsync(chatParticipants);
+                        // Send chat to all participants
+                        var chatResponse = new Dictionary<string, Dictionary<string, Chat>> { { "Individual", chat } };
+                        foreach (var participant in chatParticipants)
+                        {
+                            await Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);
+                        }
 
-                    for (int i = 0; i < chatParticipants.Count; i++)
-                    {
-                        var profileToSend = chatParticipants[i].Equals(UserId) ? recipientProfiles[recipientId] : recipientProfiles[UserId];
+                        // Send recipient profiles to participants
+                        var recipientProfiles = await _userService.GetRecipientProfilesAsync(chatParticipants);
 
-                        await Clients.User(chatParticipants[i]).SendAsync("ReceiveRecipientProfiles", new Dictionary<string, object>
+                        foreach (var participant in chatParticipants)
+                        {
+                            var otherParticipantId = chatParticipants.FirstOrDefault(p => p != participant);
+                            if (!string.IsNullOrEmpty(otherParticipantId) && recipientProfiles.ContainsKey(otherParticipantId))
                             {
-                                { profileToSend.Equals(recipientProfiles[recipientId]) ? recipientId : UserId, profileToSend }
+                                var profileResponse = new Dictionary<string, object>
+                                {
+                                    { otherParticipantId, recipientProfiles[otherParticipantId] }
+                                };
+                                await Clients.User(participant).SendAsync("ReceiveRecipientProfiles", profileResponse);
                             }
-                        );
+                        }
                     }
                 }
-                else
+                else if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
                 {
-                    var groupParticipants = await _groupService.GetGroupParticipantsAsync(UserId, chat.Values.First().Participants.First());
+                    // For group chats, recipientId would be the groupId
+                    var groupParticipants = await _groupService.GetGroupParticipantsAsync(UserId, recipientId);
 
+                    var chatResponse = new Dictionary<string, Dictionary<string, Chat>> { { "Group", chat } };
                     foreach (var participant in groupParticipants)
                     {
-                        await Clients.User(participant).SendAsync("ReceiveCreateChat", new Dictionary<string, Dictionary<string, Chat>> { { "Group", chat } });
+                        await Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);
                     }
                 }
             }
@@ -185,8 +195,6 @@ namespace ChatNest.API.Hubs
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
             }
         }
-
-
 
         /// <summary>
         /// Belirli bir sohbetin içeriğini temizler.
@@ -218,8 +226,6 @@ namespace ChatNest.API.Hubs
             }
         }
 
-
-
         /// <summary>
         /// Belirli bir sohbeti arşivler.
         /// </summary>
@@ -248,8 +254,6 @@ namespace ChatNest.API.Hubs
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
             }
         }
-
-
 
         /// <summary>
         /// Belirli bir sohbeti arşivden çıkarır.
@@ -280,8 +284,6 @@ namespace ChatNest.API.Hubs
             }
         }
 
-
-
         /// <summary>
         /// Kullanıcıdan gelen mesajı belirtilen sohbetin katılımcılarına gönderir.
         /// </summary>
@@ -299,14 +301,11 @@ namespace ChatNest.API.Hubs
             {
                 var (message, chatParticipants) = await _messageService.SendMessageAsync(UserId, chatId, chatType, dto);
 
-                var saveMessageTask = _messageRepository.CreateMessageAsync(UserId, chatType, chatId, message.First().Value.First().Value.First().Key, message.First().Value.First().Value.First().Value);
-
+                // Send message to all participants
                 foreach (var participant in chatParticipants)
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
-
-                await saveMessageTask;
             }
             catch (Exception ex) when (
                 ex is NotFoundException ||
@@ -320,8 +319,6 @@ namespace ChatNest.API.Hubs
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
             }
         }
-
-
 
         /// <summary>
         /// Bir mesajın teslim edildiğini işaretler ve sohbet katılımcılarına bildirir.
@@ -340,14 +337,11 @@ namespace ChatNest.API.Hubs
             {
                 var (message, chatParticipants) = await _messageService.DeliverOrReadMessageAsync(UserId, chatType, chatId, messageId, "Delivered");
 
-                var saveMessageTask = _messageRepository.UpdateMessageStatusAsync(chatType, chatId, message.First().Value.First().Value.First().Key, "Delivered", message.First().Value.First().Value.First().Value.Status.Delivered);
-
+                // Send updated message status to all participants
                 foreach (var participant in chatParticipants)
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
-
-                await saveMessageTask;
             }
             catch (Exception ex) when (
                 ex is NotFoundException ||
@@ -361,8 +355,6 @@ namespace ChatNest.API.Hubs
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
             }
         }
-
-
 
         /// <summary>
         /// Bir mesajın okunduğunu işaretler ve sohbet katılımcılarına bildirir.
@@ -381,14 +373,11 @@ namespace ChatNest.API.Hubs
             {
                 var (message, chatParticipants) = await _messageService.DeliverOrReadMessageAsync(UserId, chatType, chatId, messageId, "Read");
 
-                var saveMessageTask = _messageRepository.UpdateMessageStatusAsync(chatType, chatId, message.First().Value.First().Value.First().Key, "Read", message.First().Value.First().Value.First().Value.Status.Read);
-
+                // Send updated message status to all participants
                 foreach (var participant in chatParticipants)
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
-
-                await saveMessageTask;
             }
             catch (Exception ex) when (
                 ex is NotFoundException ||
@@ -402,8 +391,6 @@ namespace ChatNest.API.Hubs
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
             }
         }
-
-
 
         /// <summary>
         /// Belirtilen mesajı siler ve sohbet katılımcılarına bildirir.
@@ -423,14 +410,11 @@ namespace ChatNest.API.Hubs
             {
                 var (message, chatParticipants) = await _messageService.DeleteMessageAsync(UserId, chatType, chatId, messageId, deletionType);
 
-                var saveMessageTask = _messageRepository.UpdateMessageDeletedForAsync(chatType, chatId, messageId, message.Values.First().Values.First().Values.First().DeletedFor!);
-
+                // Send updated message to all participants (or empty message if deleted for everyone)
                 foreach (var participant in chatParticipants)
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
-
-                await saveMessageTask;
             }
             catch (Exception ex) when (
                 ex is NotFoundException ||
@@ -442,6 +426,101 @@ namespace ChatNest.API.Hubs
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Kullanıcının belirli bir gruba katılmasını sağlar.
+        /// </summary>
+        /// <param name="groupId">Katılınacak grup kimliği.</param>
+        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        public async Task JoinGroup(string groupId)
+        {
+            try
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"Group_{groupId}");
+                await Clients.Caller.SendAsync("JoinedGroup", new { groupId });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Gruba katılırken hata oluştu!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Kullanıcının belirli bir gruptan ayrılmasını sağlar.
+        /// </summary>
+        /// <param name="groupId">Ayrılınacak grup kimliği.</param>
+        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        public async Task LeaveGroup(string groupId)
+        {
+            try
+            {
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Group_{groupId}");
+                await Clients.Caller.SendAsync("LeftGroup", new { groupId });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Gruptan ayrılırken hata oluştu!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Kullanıcının çevrimiçi durumunu günceller.
+        /// </summary>
+        /// <param name="isOnline">Kullanıcının çevrimiçi olup olmadığı.</param>
+        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        public async Task UpdateOnlineStatus(bool isOnline)
+        {
+            try
+            {
+                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.UtcNow);
+
+                // Notify all contacts about the status change
+                // This would require getting user's contacts first
+                await Clients.Others.SendAsync("UserStatusChanged", new { userId = UserId, isOnline, lastSeen = DateTime.UtcNow });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Durum güncellenirken hata oluştu!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Kullanıcının yazdığını bildirir.
+        /// </summary>
+        /// <param name="chatId">Sohbet kimliği.</param>
+        /// <param name="isTyping">Yazyıp yazmadığı durumu.</param>
+        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        public async Task UpdateTypingStatus(string chatId, bool isTyping)
+        {
+            try
+            {
+                // Get chat participants to notify them
+                var (chats, _, _) = await _chatService.GetAllChatsAsync(UserId);
+
+                Chat? targetChat = null;
+                foreach (var chatType in chats.Values)
+                {
+                    if (chatType.ContainsKey(chatId))
+                    {
+                        targetChat = chatType[chatId];
+                        break;
+                    }
+                }
+
+                if (targetChat != null)
+                {
+                    var otherParticipants = targetChat.Participants.Where(p => p != UserId);
+                    foreach (var participant in otherParticipants)
+                    {
+                        await Clients.User(participant).SendAsync("UserTyping", new { chatId, userId = UserId, isTyping });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Yazma durumu güncellenirken hata oluştu!", errorDetails = ex.Message });
             }
         }
     }

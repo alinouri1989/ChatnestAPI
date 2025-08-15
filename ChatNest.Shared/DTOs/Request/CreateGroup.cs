@@ -25,5 +25,6 @@ namespace ChatNest.Shared.DTOs.Request
 
         [Required(ErrorMessage = "Grup oluşturabilmek için en az bir üye eklenmelidir.")]
         public string Participants { get; init; }
+        public List<string>? SelectedParticipants { get; set; }
     }
 }

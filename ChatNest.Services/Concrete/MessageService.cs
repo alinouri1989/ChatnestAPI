@@ -1,310 +1,156 @@
-﻿using ChatNest.DataAccess.Abstract;
+﻿using AutoMapper;
+using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
-using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 
 namespace ChatNest.Services.Concrete
 {
-    /// <summary>
-    /// Mesaj gönderme, silme ve durum güncelleme işlemlerini yöneten servis sınıfıdır.
-    /// Sohbetler arası mesajlaşma işlemleri için gerekli işlemleri içerir.
-    /// </summary>
     public sealed class MessageService : IMessageService
     {
-        private readonly IGroupRepository _groupRepository;
-        private readonly ICloudRepository _cloudRepository;
+        private readonly IMessageRepository _messageRepository;
         private readonly IChatRepository _chatRepository;
+        private readonly ICloudRepository _cloudRepository;
+        private readonly IMapper _mapper;
 
-
-
-        /// <summary>
-        /// MessageService sınıfının yeni bir örneğini oluşturur.
-        /// </summary>
-        /// <param name="groupRepository">Grup yönetimi için kullanılan repository.</param>
-        /// <param name="cloudRepository">Dosya yükleme işlemleri için kullanılan repository.</param>
-        /// <param name="chatRepository">Sohbet yönetimi için kullanılan repository.</param>
-        public MessageService(IGroupRepository groupRepository, ICloudRepository cloudRepository, IChatRepository chatRepository)
+        public MessageService(
+            IMessageRepository messageRepository,
+            IChatRepository chatRepository,
+            ICloudRepository cloudRepository,
+            IMapper mapper)
         {
-            _groupRepository = groupRepository;
-            _cloudRepository = cloudRepository;
+            _messageRepository = messageRepository;
             _chatRepository = chatRepository;
+            _cloudRepository = cloudRepository;
+            _mapper = mapper;
         }
 
-
-        /// <summary>
-        /// Bir mesajı gönderir.
-        /// </summary>
-        /// <param name="userId">Mesajı gönderen kullanıcının ID'si.</param>
-        /// <param name="chatId">Mesajın gönderileceği sohbetin ID'si.</param>
-        /// <param name="chatType">Sohbet tipi (Bireysel ya da Grup).</param>
-        /// <param name="dto">Gönderilen mesajın içeriği.</param>
-        /// <returns>Gönderilen mesajın bilgilerini içeren bir tuple.</returns>
-        /// <exception cref="NotFoundException">Sohbet bulunamadığında fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcı sohbet üzerinde yetkiye sahip değilse fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler için fırlatılır.</exception>
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(string userId, string chatId, string chatType, SendMessage dto)
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(
+            string userId, string chatId, string chatType, SendMessage dto)
         {
-            var chatParticipants = await _chatRepository.GetChatParticipantsByIdAsync(chatType, chatId) ?? throw new NotFoundException("Sohbet bulunamadı.");
-
-            if (chatType.Equals("Individual"))
-            {
-                if (!chatParticipants.Contains(userId))
-                {
-                    throw new ForbiddenException("Sohbet üzerinde yetkiniz yok.");
-                }
-            }
-            else if (chatType.Equals("Group"))
-            {
-                chatParticipants = await _groupRepository.GetGroupParticipantsIdsAsync(chatParticipants.First()) ?? throw new NotFoundException("Grup bulunamadı.");
-                if (!chatParticipants.Contains(userId))
-                {
-                    throw new ForbiddenException("Sohbet üzerinde yetkiniz yok.");
-                }
-            }
-            else
-            {
-                throw new BadRequestException("chatType geçersiz.");
-            }
-
-            string messageId = Guid.NewGuid().ToString();
-            string messageContent;
-            long? fileSize = null;
-
-            if (dto.ContentType.Equals(MessageContent.Text))
-            {
-                messageContent = dto.Content;
-            }
-            else if (dto.ContentType.Equals(MessageContent.Image))
-            {
-                var photoUrl = await _cloudRepository.UploadPhotoAsync(messageId, $"Chats/{chatId}", "image_message", FileValidationHelper.ValidatePhoto(dto.Content));
-                messageContent = photoUrl.ToString() ?? throw new Exception("Dosya yüklenemedi.");
-            }
-            else if (dto.ContentType.Equals(MessageContent.Video))
-            {
-                var videoUrl = await _cloudRepository.UploadVideoAsync(messageId, $"Chats/{chatId}", "video_message", FileValidationHelper.ValidateVideo(dto.Content));
-                messageContent = videoUrl.ToString() ?? throw new Exception("Dosya yüklenemedi.");
-            }
-            else if (dto.ContentType.Equals(MessageContent.Audio))
-            {
-                var audioUrl = await _cloudRepository.UploadAudioAsync(messageId, $"Chats/{chatId}", "audio_message", FileValidationHelper.ValidateVideo(dto.Content));
-                messageContent = audioUrl.ToString() ?? throw new Exception("Dosya yüklenemedi.");
-            }
-            else if (dto.ContentType.Equals(MessageContent.File))
-            {
-                var (fileUrl, size) = await _cloudRepository.UploadFileAsync(messageId, $"Chats/{chatId}", "file_message", FileValidationHelper.ValidateFile(dto.Content));
-                messageContent = fileUrl.ToString() ?? throw new Exception("Dosya yüklenemedi.");
-                fileSize = size;
-            }
-            else
-            {
-                throw new BadRequestException("contentType geçersiz.");
-            }
-
+            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            if (chat == null || !chat.Participants.Contains(userId))
+                throw new NotFoundException("Chat not found or access denied");
 
             var message = new Message
             {
-                Content = messageContent,
-                FileName = dto.FileName,
-                FileSize = fileSize,
+                SenderId = userId,
+                ChatId = Guid.Parse(chatId),
+                Content = dto.Content,
                 Type = dto.ContentType,
+                CreatedDate = DateTime.UtcNow,
                 Status = new MessageStatus
                 {
-                    Sent = new Dictionary<string, DateTime>
-                    {
-                        { userId, DateTime.UtcNow }
-                    }
+                    Sent = new Dictionary<string, DateTime> { { userId, DateTime.UtcNow } },
+                    Delivered = new Dictionary<string, DateTime>(),
+                    Read = new Dictionary<string, DateTime>()
                 }
             };
 
-            var messageVM = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
+            // Handle file uploads
+            if (dto.ContentType != MessageContent.Text && dto.File != null)
             {
+                using var fileStream = new MemoryStream(dto.File);
+                Uri fileUrl;
+                long fileSize = dto.File.Length;
+
+                switch (dto.ContentType)
                 {
-                    chatType, new Dictionary<string, Dictionary<string, Message>>
-                    {
-                        {
-                            chatId, new Dictionary<string, Message>
-                            {
-                                { messageId, message }
-                            }
-                        }
-                    }
+                    case MessageContent.Image:
+                        fileUrl = await _cloudRepository.UploadPhotoAsync($"message_{message.Id}", "messages", "message,image", fileStream);
+                        break;
+                    case MessageContent.Video:
+                        fileUrl = await _cloudRepository.UploadVideoAsync($"message_{message.Id}", "messages", "message,video", fileStream);
+                        break;
+                    case MessageContent.Audio:
+                        fileUrl = await _cloudRepository.UploadAudioAsync($"message_{message.Id}", "messages", "message,audio", fileStream);
+                        break;
+                    case MessageContent.File:
+                        var (url, size) = await _cloudRepository.UploadFileAsync($"message_{message.Id}", "messages", "message,file", fileStream);
+                        fileUrl = url;
+                        fileSize = size;
+                        break;
+                    default:
+                        throw new BadRequestException("Invalid message type");
                 }
+
+                message.Content = fileUrl.ToString();
+                message.FileName = dto.FileName;
+                message.FileSize = fileSize;
+            }
+
+            await _messageRepository.CreateMessageAsync(message);
+
+            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
+            {
+                { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { message.Id.ToString(), message } } } } }
             };
 
-            return (messageVM, chatParticipants);
+            return (result, chat.Participants);
         }
 
-
-
-        /// <summary>
-        /// Bir mesajı siler.
-        /// </summary>
-        /// <param name="userId">Mesajı silen kullanıcının ID'si.</param>
-        /// <param name="chatType">Sohbet tipi (Bireysel ya da Grup).</param>
-        /// <param name="chatId">Sohbetin ID'si.</param>
-        /// <param name="messageId">Silinecek mesajın ID'si.</param>
-        /// <param name="deletionType">Silme türü (0: Sadece kendisi, 1: Herkes için).</param>
-        /// <returns>Silinen mesajın bilgilerini içeren bir tuple.</returns>
-        /// <exception cref="NotFoundException">Mesaj bulunamadığında fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcı sohbet üzerinde yetkiye sahip değilse fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler için fırlatılır.</exception>
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(string userId, string chatType, string chatId, string messageId, byte deletionType)
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(
+            string userId, string chatType, string chatId, string messageId, byte deletionType)
         {
-            FieldValidationHelper.ValidateRequiredFields((chatType, "chatType"), (chatId, "chatId"), (messageId, "messageId"));
+            var message = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            if (message == null)
+                throw new NotFoundException("Message not found");
 
-            var chat = await _chatRepository.GetChatByIdAsync(chatType, chatId);
+            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            if (chat == null || !chat.Participants.Contains(userId))
+                throw new NotFoundException("Chat not found or access denied");
 
-            var chatParticipants = chat.Participants;
-
-
-            if (chatType.Equals("Individual"))
+            if (deletionType == 1) // Delete for everyone (only sender can do this)
             {
-                if (!chatParticipants.Contains(userId))
+                if (message.SenderId != userId)
+                    throw new BadRequestException("You can only delete your own messages for everyone");
+
+                await _messageRepository.DeleteMessageAsync(Guid.Parse(messageId));
+            }
+            else // Delete for me only
+            {
+                var deletedFor = message.DeletedFor;
+                deletedFor[userId] = DateTime.UtcNow;
+                await _messageRepository.UpdateMessageDeletedForAsync(Guid.Parse(messageId), deletedFor);
+            }
+
+            var updatedMessage = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>();
+
+            if (updatedMessage != null)
+            {
+                result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
                 {
-                    throw new ForbiddenException("Sohbet üzerinde yetkiniz yok.");
-                }
-            }
-            else if (chatType.Equals("Group"))
-            {
-                chatParticipants = await _groupRepository.GetGroupParticipantsIdsAsync(chatParticipants.First()) ?? throw new NotFoundException("Grup bulunamadı.");
-
-                if (!chatParticipants.Contains(userId))
-                {
-                    throw new ForbiddenException("Sohbet üzerinde yetkiniz yok.");
-                }
-            }
-            else
-            {
-                throw new BadRequestException("chatType geçersiz.");
+                    { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage } } } } }
+                };
             }
 
-            var message = chat.Messages.GetValueOrDefault(messageId) ?? throw new NotFoundException("Mesaj bulunamadı.");
-
-            if (deletionType.Equals(0))
-            {
-                message.DeletedFor!.Add(userId, DateTime.UtcNow);
-                message.Content = "";
-            }
-            else if (deletionType.Equals(1))
-            {
-                foreach (var participant in chatParticipants)
-                {
-                    message.DeletedFor!.Add(participant, DateTime.UtcNow);
-                }
-
-                message.Content = "Bu mesaj silindi.";
-            }
-            else
-            {
-                throw new BadRequestException("deletionType geçersiz.");
-            }
-
-            var messageVM = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-            {
-                {
-                    chatType, new Dictionary<string, Dictionary<string, Message>>
-                    {
-                        {
-                            chatId, new Dictionary<string, Message>
-                            {
-                                { messageId, message }
-                            }
-                        }
-                    }
-                }
-            };
-
-            return (messageVM, chatParticipants);
+            return (result, chat.Participants);
         }
 
-
-
-        /// <summary>
-        /// Bir mesajın teslim veya okunma durumunu günceller.
-        /// </summary>
-        /// <param name="userId">Durumu güncelleyen kullanıcının ID'si.</param>
-        /// <param name="chatType">Sohbet tipi (Bireysel ya da Grup).</param>
-        /// <param name="chatId">Sohbetin ID'si.</param>
-        /// <param name="messageId">Durumu güncellenecek mesajın ID'si.</param>
-        /// <param name="fieldName">Güncellenecek durum (Delivered veya Read).</param>
-        /// <returns>Güncellenmiş mesajın bilgilerini içeren bir tuple.</returns>
-        /// <exception cref="NotFoundException">Mesaj bulunamadığında fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcı sohbet üzerinde yetkiye sahip değilse fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler için fırlatılır.</exception>
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(string userId, string chatType, string chatId, string messageId, string fieldName)
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(
+            string userId, string chatType, string chatId, string messageId, string fieldName)
         {
-            FieldValidationHelper.ValidateRequiredFields((chatType, "chatType"), (chatId, "chatId"), (messageId, "messageId"));
+            var message = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            if (message == null)
+                throw new NotFoundException("Message not found");
 
-            var chat = await _chatRepository.GetChatByIdAsync(chatType, chatId) ?? throw new NotFoundException("Sohbet bulunamadı!");
+            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            if (chat == null || !chat.Participants.Contains(userId))
+                throw new NotFoundException("Chat not found or access denied");
 
-            var chatParticipants = chat.Participants;
+            var statusUpdate = new Dictionary<string, DateTime> { { userId, DateTime.UtcNow } };
+            await _messageRepository.UpdateMessageStatusAsync(Guid.Parse(messageId), fieldName, statusUpdate);
 
-            if (chatType.Equals("Individual"))
+            var updatedMessage = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
             {
-                if (!chatParticipants.Contains(userId))
-                {
-                    throw new ForbiddenException("Sohbet üzerinde yetkiniz yok.");
-                }
-            }
-            else if (chatType.Equals("Group"))
-            {
-                chatParticipants = await _groupRepository.GetGroupParticipantsIdsAsync(chatParticipants.First()) ?? throw new NotFoundException("Grup bulunamadı.");
-
-                if (!chatParticipants.Contains(userId))
-                {
-                    throw new ForbiddenException("Sohbet üzerinde yetkiniz yok.");
-                }
-            }
-            else
-            {
-                throw new BadRequestException("chatType geçersiz.");
-            }
-
-            var message = chat.Messages.GetValueOrDefault(messageId) ?? throw new NotFoundException("Mesaj bulunamadı.");
-
-            if (fieldName.Equals("Delivered"))
-            {
-                if (!message.Status.Delivered.ContainsKey(userId))
-                {
-                    message.Status.Delivered.Add(userId, DateTime.UtcNow);
-                }
-
-                if (message.DeletedFor!.ContainsKey(userId))
-                {
-                    message.Content = "Bu mesaj silindi.";
-                }
-            }
-            else if (fieldName.Equals("Read"))
-            {
-                if (!message.Status.Read.ContainsKey(userId))
-                {
-                    message.Status.Read.Add(userId, DateTime.UtcNow);
-                }
-            }
-            else
-            {
-                throw new BadRequestException("fieldName geçersiz.");
-            }
-
-            var messageVM = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-            {
-                {
-                    chatType, new Dictionary<string, Dictionary<string, Message>>
-                    {
-                        {
-                            chatId, new Dictionary<string, Message>
-                            {
-                                { messageId, message }
-                            }
-                        }
-                    }
-                }
+                { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage! } } } } }
             };
 
-            return (messageVM, chatParticipants);
+            return (result, chat.Participants);
         }
     }
 }

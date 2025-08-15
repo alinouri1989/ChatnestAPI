@@ -18,6 +18,7 @@ namespace ChatNest.Services.Abstract
 
 
 
+
         /// <summary>
         /// Kullanıcı bilgilerini getirir.
         /// </summary>

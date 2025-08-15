@@ -10,6 +10,7 @@
         Image,
         Video,
         Audio,
-        File
+        File,
+        Location
     }
 }

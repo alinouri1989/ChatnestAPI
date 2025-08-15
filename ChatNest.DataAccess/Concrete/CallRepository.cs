@@ -1,75 +1,81 @@
-﻿using Firebase.Database;
-using Firebase.Database.Query;
-using Microsoft.Extensions.Options;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Configurations;
+﻿using ChatNest.DataAccess.Abstract;
+using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatNest.DataAccess.Concrete
 {
-    /// <summary>
-    /// Firebase veritabanında çağrı (Call) işlemlerini yöneten depo (repository) sınıfı.
-    /// </summary>
+
     public sealed class CallRepository : ICallRepository
     {
-        private readonly FirebaseClient _databaseClient;
+        private readonly ChatNestDbContext _context;
 
-
-
-        /// <summary>
-        /// `CallRepository` sınıfını başlatır ve Firebase veritabanı bağlantısını yapılandırır.
-        /// </summary>
-        /// <param name="firebaseConfig">Firebase yapılandırma ayarlarını içeren nesne.</param>
-        public CallRepository(FirebaseConfig firebaseConfig)
+        public CallRepository(ChatNestDbContext context)
         {
-            _databaseClient = firebaseConfig.DatabaseClient;
+            _context = context;
         }
 
-
-
-        /// <summary>
-        /// Firebase veritabanındaki tüm çağrıları getirir.
-        /// </summary>
-        /// <returns>Çağrı nesnelerinin koleksiyonu.</returns>
-        public async Task<IReadOnlyCollection<FirebaseObject<Call>>> GetCallsAsync()
+        public async Task<IEnumerable<Call>> GetCallsAsync()
         {
-            return await _databaseClient.Child("Calls").OnceAsync<Call>();
+            return await _context.Calls
+                .Include(c => c.Chat)
+                .ToListAsync();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen çağrıyı oluşturur veya mevcut bir çağrıyı günceller.
-        /// </summary>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <param name="call">Çağrı nesnesi.</param>
-        public async Task CreateOrUpdateCallAsync(string callId, Call call)
+        public async Task CreateOrUpdateCallAsync(Call call)
         {
-            await _databaseClient.Child("Calls").Child(callId).PutAsync(call);
+            if (call.Id == Guid.Empty)
+            {
+                call.Id = Guid.NewGuid();
+                call.CreatedDate = DateTime.UtcNow;
+                _context.Calls.Add(call);
+            }
+            else
+            {
+                _context.Calls.Update(call);
+            }
+
+            await _context.SaveChangesAsync();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen kimliğe sahip çağrıyı getirir.
-        /// </summary>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <returns>Çağrı nesnesi.</returns>
-        public async Task<Call> GetCallByIdAsync(string callId)
+        public async Task<Call?> GetCallByIdAsync(Guid callId)
         {
-            return await _databaseClient.Child("Calls").Child(callId).OnceSingleAsync<Call>();
+            return await _context.Calls
+                .Include(c => c.Chat)
+                .FirstOrDefaultAsync(c => c.Id == callId);
         }
 
-
-
-        /// <summary>
-        /// Belirtilen çağrıya ait katılımcıların kimliklerini getirir.
-        /// </summary>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <returns>Katılımcıların kimliklerini içeren liste.</returns>
-        public async Task<List<string>> GetCallParticipantsByIdAsync(string callId)
+        public async Task<List<string>> GetCallParticipantsByIdAsync(Guid callId)
         {
-            return await _databaseClient.Child("Calls").Child(callId).Child("Participants").OnceSingleAsync<List<string>>();
+            var call = await _context.Calls.FindAsync(callId);
+            return call?.Participants ?? new List<string>();
+        }
+
+        public async Task UpdateCallAsync(Call call)
+        {
+            _context.Calls.Update(call);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> DeleteCallAsync(Guid callId)
+        {
+            var call = await _context.Calls.FindAsync(callId);
+            if (call != null)
+            {
+                _context.Calls.Remove(call);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<IEnumerable<Call>> GetUserCallsAsync(string userId)
+        {
+            return await _context.Calls
+                .Where(c => c.Participants.Contains(userId))
+                .Include(c => c.Chat)
+                .OrderByDescending(c => c.CreatedDate)
+                .ToListAsync();
         }
     }
 }

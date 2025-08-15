@@ -35,5 +35,6 @@ namespace ChatNest.Shared.DTOs.Request
 
         [Required(ErrorMessage = "Lütfen doğum tarihinizi giriniz.")]
         public DateTime BirthDate { get; init; }
+        public string? PhoneNumber { get; set; }
     }
 }

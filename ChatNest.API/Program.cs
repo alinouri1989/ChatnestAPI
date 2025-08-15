@@ -1,119 +1,63 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using ChatNest.API.Hubs;
 using ChatNest.Core.Abstract;
 using ChatNest.Core.Concrete;
 using ChatNest.DataAccess.Abstract;
 using ChatNest.DataAccess.Concrete;
 using ChatNest.DataAccess.Configurations;
+using ChatNest.DataAccess.Contexts;
+using ChatNest.Entities.Identity;
+using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Concrete;
 using ChatNest.Services.Mapping;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using System.Text;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add DbContext
+builder.Services.AddDbContext<ChatNestDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-if (builder.Environment.IsDevelopment())
+// Add Identity
+builder.Services.AddIdentity<User, Role>(options =>
 {
-    builder.Configuration.AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true);
-}
-else
-{
-    builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-}
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
 
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
+    options.Lockout.MaxFailedAccessAttempts = 5;
 
-builder.Configuration.AddEnvironmentVariables();
-builder.Services.AddControllers();
+    options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedEmail = false;
+})
+            .AddRoles<Role>()
+            .AddRoleManager<RoleManager<Role>>()
+            .AddRoleValidator<RoleValidator<Role>>()
+            .AddEntityFrameworkStores<ChatNestDbContext>()
+            .AddDefaultTokenProviders();
 
+// Configure Cloudinary
+builder.Services.AddSingleton<CloudinaryConfig>(provider =>
+    new CloudinaryConfig(builder.Configuration));
 
-// SignalR
-builder.Services.AddSignalR(options =>
-{
-    options.MaximumReceiveMessageSize = 41943040; // 5 MB
-});
+// Configure AI Services
+builder.Services.AddSingleton<GeminiConfig>(provider =>
+    new GeminiConfig(builder.Configuration));
 
+builder.Services.AddSingleton<HuggingFaceConfig>(provider =>
+    new HuggingFaceConfig(builder.Configuration));
 
-// Cors
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("ChatNest.Cors", policy =>
-    {
-        policy.WithOrigins("https://ChatNestweb.netlify.app", "https://localhost:5173")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials(); 
-    });
-});
+// Add JWT Authentication
+var jwtSettings = builder.Configuration.GetSection("JWT");
+var secretKey = jwtSettings["SecretKey"] ?? "your-super-secret-key-that-is-at-least-32-characters-long";
 
-
-// Swagger
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        In = ParameterLocation.Header,
-        Description = "Please enter JWT with Bearer into field",
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-        BearerFormat = "JWT",
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[] {}
-        }
-    });
-});
-
-
-// Dependency Injection
-builder.Services.AddScoped<IAuthManager, AuthManager>();
-builder.Services.AddSingleton<IJwtManager, JwtManager>();
-
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IAuthRepository, AuthRepository>();
-builder.Services.AddScoped<IChatRepository, ChatRepository>();
-builder.Services.AddScoped<ICallRepository, CallRepository>();
-builder.Services.AddScoped<IGroupRepository, GroupRepository>();
-builder.Services.AddScoped<ICloudRepository, CloudRepository>();
-builder.Services.AddScoped<IMessageRepository, MessageRepository>();
-
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IChatService, ChatService>();
-builder.Services.AddScoped<ICallService, CallService>();
-builder.Services.AddScoped<IGroupService, GroupService>();
-builder.Services.AddScoped<IMessageService, MessageService>();
-builder.Services.AddScoped<IGenerativeAiService, GenerativeAiService>();
-
-
-// AutoMapper
-builder.Services.AddAutoMapper(typeof(MappingProfile));
-
-
-// Configurations
-builder.Services.AddSingleton<FirebaseConfig>();
-builder.Services.AddSingleton<CloudinaryConfig>();
-builder.Services.AddSingleton<GeminiConfig>();
-builder.Services.AddSingleton<HuggingFaceConfig>();
-
-
-// Authentication JWT
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -121,60 +65,115 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false;
+    options.Authority = jwtSettings["Issuer"];
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["JwtSettings:issuer"] ?? throw new ArgumentNullException("JwtSettings:issuer"),
-        ValidAudience = builder.Configuration["JwtSettings:audience"] ?? throw new ArgumentNullException("JwtSettings:audience"),
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:secret"] ?? throw new ArgumentNullException("JwtSettings:secret")))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings["Issuer"] ?? "chatnest-api",
+        ValidateAudience = true,
+        ValidAudience = jwtSettings["Audience"] ?? "chatnest-clients",
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+
+    // Configure JWT authentication for SignalR
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
     };
 });
 
+// Add Authorization
+builder.Services.AddAuthorization();
 
-var app = builder.Build();
+// Register JWT Manager
+builder.Services.AddScoped<IJwtManager, JwtManager>();
 
+// Register Repositories
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IChatRepository, ChatRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+builder.Services.AddScoped<ICallRepository, CallRepository>();
+builder.Services.AddScoped<ICloudRepository, CloudRepository>();
 
-// Error
-app.UseExceptionHandler(errorApp =>
+// Register Services
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IMessageService, MessageService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<ICallService, CallService>();
+builder.Services.AddScoped<IGenerativeAiService, GenerativeAiService>();
+
+// Add HttpClient for AI services
+builder.Services.AddHttpClient();
+
+// Add AutoMapper
+builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+// Add SignalR
+builder.Services.AddSignalR();
+
+// Add Controllers
+builder.Services.AddControllers();
+
+// Add CORS
+builder.Services.AddCors(options =>
 {
-    errorApp.Run(async context =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-
-        var errorFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-        if (errorFeature != null)
-        {
-            var errorMessage = errorFeature.Error.Message;
-            var stackTrace = errorFeature.Error.StackTrace;
-
-            var errorResponse = new { error = errorMessage, details = stackTrace };
-            await context.Response.WriteAsJsonAsync(errorResponse);
-        }
+        policy.WithOrigins("http://localhost:3000", "https://localhost:3000") // Add your frontend URLs
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); // Important for SignalR
     });
 });
 
+// Add Swagger for development
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-// Swagger UI
-app.UseSwagger();
-app.UseSwaggerUI();
+var app = builder.Build();
 
+// Configure pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.UseDeveloperExceptionPage();
+}
 
-// Middleware 
 app.UseHttpsRedirection();
-app.UseCors("ChatNest.Cors");
+app.UseCors("AllowAll");
+app.UseRouting();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
+app.MapHub<ChatHub>("/chatHub");
 
-
-// SignalR Hubs
-app.MapHub<ChatHub>("hub/Chat");
-app.MapHub<CallHub>("hub/Call");
-app.MapHub<NotificationHub>("hub/Notification");
-
+// Apply migrations
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ChatNestDbContext>();
+    context.Database.Migrate();
+}
 
 app.Run();

@@ -24,7 +24,9 @@ namespace ChatNest.Services.Mapping
                 .ForMember(dest => dest.ProviderId, opt => opt.MapFrom(src => "email"))
                 .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(src => new UserSettings()))
-                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => DateTime.UtcNow));
+                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.UserSettingsJson, opt => opt.Ignore());
 
 
             // ProviderData => User
@@ -37,7 +39,8 @@ namespace ChatNest.Services.Mapping
                 .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.BirthDate, opt => opt.MapFrom(src => DateTime.MinValue))
                 .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(src => new UserSettings()))
-                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => DateTime.UtcNow));
+                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.Id, opt => opt.Ignore());
 
 
             // User => UserInfo
@@ -54,6 +57,11 @@ namespace ChatNest.Services.Mapping
 
             // User => CallerUser
             CreateMap<User, CallerUser>();
+
+            // Group mappings
+            CreateMap<Group, GroupProfile>()
+                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.ToString()))
+                .ForMember(dest => dest.PhotoUrl, opt => opt.MapFrom(src => src.Photo != null ? src.Photo.ToString() : null));
         }
     }
 }

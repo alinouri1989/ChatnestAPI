@@ -1,99 +1,95 @@
-﻿using Firebase.Database;
-using Firebase.Database.Query;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Configurations;
+﻿using ChatNest.DataAccess.Abstract;
+using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatNest.DataAccess.Concrete
 {
-    /// <summary>
-    /// Firebase veritabanı ile kullanıcı (User) yönetimi işlemlerini gerçekleştiren repository sınıfıdır.
-    /// </summary>
     public sealed class UserRepository : IUserRepository
     {
-        private readonly FirebaseClient _databaseClient;
+        private readonly ChatNestDbContext _context;
 
-
-
-        /// <summary>
-        /// UserRepository sınıfının yeni bir örneğini oluşturur.
-        /// </summary>
-        /// <param name="firebaseConfig">Firebase yapılandırma bilgilerini içeren nesne.</param>
-        public UserRepository(FirebaseConfig firebaseConfig)
+        public UserRepository(ChatNestDbContext context)
         {
-            _databaseClient = firebaseConfig.DatabaseClient;
+            _context = context;
         }
 
-
-
-        /// <summary>
-        /// Veritabanındaki tüm kullanıcıları getirir.
-        /// </summary>
-        /// <returns>Kullanıcıların listesini içeren bir koleksiyon.</returns>
-        public async Task<IReadOnlyCollection<FirebaseObject<User>>> GetAllUsersAsync()
+        public async Task<IEnumerable<User>> GetAllUsersAsync()
         {
-            return await _databaseClient.Child("Users").OnceAsync<User>();
+            return await _context.Users.ToListAsync();
         }
 
-
-
-        /// <summary>
-        /// Yeni bir kullanıcı oluşturur veya mevcut kullanıcıyı günceller.
-        /// </summary>
-        /// <param name="userId">Kullanıcının benzersiz kimliği.</param>
-        /// <param name="user">Kullanıcı bilgilerini içeren nesne.</param>
-        public async Task CreateUserAsync(string userId, User user)
+        public async Task CreateUserAsync(User user)
         {
-            await _databaseClient.Child("Users").Child(userId).PatchAsync(user);
+            user.CreatedDate = DateTime.UtcNow;
+            user.LastConnectionDate = DateTime.UtcNow;
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen kimliğe sahip kullanıcıyı getirir.
-        /// </summary>
-        /// <param name="userId">Kullanıcının benzersiz kimliği.</param>
-        /// <returns>Belirtilen kullanıcıya ait nesne.</returns>
-        public async Task<User> GetUserByIdAsync(string userId)
+        public async Task<User?> GetUserByIdAsync(string userId)
         {
-            return await _databaseClient.Child("Users").Child(userId).OnceSingleAsync<User>();
+            return await _context.Users.FindAsync(userId);
         }
 
+        public async Task<User?> GetUserByEmailAsync(string email)
+        {
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        }
 
+        public async Task<User?> GetUserByProviderIdAsync(string providerId)
+        {
+            return await _context.Users.FirstOrDefaultAsync(u => u.ProviderId == providerId);
+        }
 
-        /// <summary>
-        /// Kullanıcının belirli bir alanını günceller.
-        /// </summary>
-        /// <param name="userId">Kullanıcının benzersiz kimliği.</param>
-        /// <param name="fieldName">Güncellenecek alanın adı.</param>
-        /// <param name="newValue">Yeni değer.</param>
         public async Task UpdateUserFieldAsync(string userId, string fieldName, object newValue)
         {
-            var fieldData = new Dictionary<string, object>
-            {
-                { fieldName, newValue }
-            };
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return;
 
-            await _databaseClient.Child("Users").Child(userId).PatchAsync(fieldData);
+            var property = typeof(User).GetProperty(fieldName);
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(user, newValue);
+                await _context.SaveChangesAsync();
+            }
         }
 
-
-
-        /// <summary>
-        /// Kullanıcının belirli bir ayarını günceller.
-        /// </summary>
-        /// <param name="userId">Kullanıcının benzersiz kimliği.</param>
-        /// <param name="settingsName">Güncellenecek ayar kategorisinin adı.</param>
-        /// <param name="fieldName">Güncellenecek alanın adı.</param>
-        /// <param name="newValue">Yeni değer.</param>
-        public async Task UpdateSettingsAsync(string userId, string settingsName, string fieldName, object newValue)
+        public async Task UpdateUserAsync(User user)
         {
-            var fieldData = new Dictionary<string, object>
-            {
-                { fieldName, newValue }
-            };
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
 
-            await _databaseClient.Child("Users").Child(userId).Child(settingsName).PatchAsync(fieldData);
+        public async Task UpdateLastConnectionDateAsync(string userId, DateTime lastConnectionDate)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user != null)
+            {
+                user.LastConnectionDate = lastConnectionDate;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<bool> DeleteUserAsync(string userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user != null)
+            {
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<IEnumerable<User>> SearchUsersAsync(string searchTerm)
+        {
+            return await _context.Users
+                .Where(u => u.DisplayName.Contains(searchTerm) ||
+                           u.Email.Contains(searchTerm))
+                .ToListAsync();
         }
     }
 }

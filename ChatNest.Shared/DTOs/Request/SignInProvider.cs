@@ -23,11 +23,12 @@
     public sealed record ProviderData
     {
         public required string ProviderId { get; init; }
-        public required string Uid { get; init; }
+        public required long Uid { get; init; }
         public required string DisplayName { get; init; }
         public required string Email { get; init; }
         public string? PhoneNumber { get; init; }
         public required string PhotoURL { get; init; }
+        public string? PhotoUrl { get; set; }
     }
 
     public sealed record StsTokenManager

@@ -1,227 +1,130 @@
-﻿using ChatNest.DataAccess.Abstract;
+﻿using AutoMapper;
+using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
-using ChatNest.Services.Utilities;
 
 namespace ChatNest.Services.Concrete
 {
-    /// <summary>
-    /// Kullanıcı çağrılarını yöneten servis sınıfıdır.
-    /// Çağrı başlatma, kabul etme, sonlandırma ve çağrı geçmişini getirme gibi işlemleri içerir.
-    /// </summary>
     public sealed class CallService : ICallService
     {
         private readonly ICallRepository _callRepository;
+        private readonly IChatRepository _chatRepository;
+        private readonly IMapper _mapper;
 
-
-
-        /// <summary>
-        /// CallService sınıfının yeni bir örneğini oluşturur.
-        /// </summary>
-        /// <param name="callRepository">Çağrı işlemleri için kullanılan repository.</param>
-        public CallService(ICallRepository callRepository)
+        public CallService(ICallRepository callRepository, IChatRepository chatRepository, IMapper mapper)
         {
             _callRepository = callRepository;
+            _chatRepository = chatRepository;
+            _mapper = mapper;
         }
 
-
-        /// <summary>
-        /// Yeni bir çağrı başlatır.
-        /// </summary>
-        /// <param name="userId">Çağrıyı başlatan kullanıcının kimliği.</param>
-        /// <param name="recipientId">Çağrının alıcısının kimliği.</param>
-        /// <param name="callType">Çağrı türü (sesli veya görüntülü).</param>
-        /// <returns>Çağrı kimliği döndürülür.</returns>
-        /// <exception cref="BadRequestException">Kullanıcı başka bir çağrıda ise fırlatılır.</exception>
         public async Task<string> StartCallAsync(string userId, string recipientId, CallType callType)
         {
-            FieldValidationHelper.ValidateRequiredFields((recipientId, "recipientId"), (callType.ToString(), "callType"));
-
-            var callSnapshot = await _callRepository.GetCallsAsync();
-
-            var userActiveCalls = callSnapshot
-                .Where(call =>
-                    (call.Object.Participants.Contains(recipientId) || call.Object.Participants.Contains(userId))
-                    &&
-                    (call.Object.Status.Equals(CallStatus.Ongoing) || call.Object.Status.Equals(CallStatus.Pending))
-                );
-
-            var callId = Guid.NewGuid().ToString();
+            var participants = new List<string> { userId, recipientId };
 
             var call = new Call
             {
-                Participants = [userId, recipientId],
+                Participants = participants,
                 Type = callType,
-                Status = userActiveCalls.Count() != 0 ? CallStatus.Declined : CallStatus.Pending,
+                Status = CallStatus.Pending,
                 CreatedDate = DateTime.UtcNow
             };
 
-            await _callRepository.CreateOrUpdateCallAsync(callId, call);
-
-            if (userActiveCalls.Count() != 0)
+            // Try to find an existing chat between participants
+            var chat = await _chatRepository.GetChatByParticipantsAsync(participants);
+            if (chat != null)
             {
-                throw new BadRequestException("Kullanıcı meşgul!");
+                call.ChatId = chat.Id;
             }
 
-            return callId;
+            await _callRepository.CreateOrUpdateCallAsync(call);
+
+            return call.Id.ToString();
         }
 
-
-
-        /// <summary>
-        /// Kullanıcının gelen bir çağrıyı kabul etmesini sağlar.
-        /// </summary>
-        /// <param name="userId">Çağrıyı kabul eden kullanıcının kimliği.</param>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <returns>Asenkron işlemi temsil eden bir <see cref="Task"/> nesnesi.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının çağrı üzerinde yetkisi yoksa fırlatılır.</exception>
         public async Task AcceptCallAsync(string userId, string callId)
         {
-            FieldValidationHelper.ValidateRequiredFields((callId, "callId"));
+            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            if (call == null || !call.Participants.Contains(userId))
+                throw new NotFoundException("Call not found or access denied");
 
-            var call = await _callRepository.GetCallByIdAsync(callId) ?? throw new NotFoundException("Çağrı bulunamadı");
+            if (call.Status != CallStatus.Pending)
+                throw new BadRequestException("Call is not in pending state");
 
-            if (!call.Participants.Contains(userId))
-            {
-                throw new ForbiddenException("Çağrı üzerinde yetkiniz yok.");
-            }
-
-            call.Status = CallStatus.Ongoing;
-
-            await _callRepository.CreateOrUpdateCallAsync(callId, call);
+            call.Status = CallStatus.Accepted;
+            await _callRepository.UpdateCallAsync(call);
         }
 
-
-
-        /// <summary>
-        /// Bir çağrıyı sonlandırır.
-        /// </summary>
-        /// <param name="userId">Çağrıyı sonlandıran kullanıcının kimliği.</param>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <param name="callStatus">Çağrının sonlandırılma durumu.</param>
-        /// <param name="createdDate">Çağrının başlama tarihi.</param>
-        /// <returns>Çağrı bilgilerini içeren bir sözlük döndürülür.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının çağrı üzerinde yetkisi yoksa fırlatılır.</exception>
         public async Task<Dictionary<string, Call>> EndCallAsync(string userId, string callId, CallStatus callStatus, DateTime? createdDate)
         {
-            FieldValidationHelper.ValidateRequiredFields((callId, "callId"), (callStatus.ToString(), "callStatus"));
-
-            var call = await _callRepository.GetCallByIdAsync(callId) ?? throw new NotFoundException("Çağrı bulunamadı");
-
-            if (!call.Participants.Contains(userId))
-            {
-                throw new ForbiddenException("Çağrı üzerinde yetkiniz yok.");
-            }
+            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            if (call == null || !call.Participants.Contains(userId))
+                throw new NotFoundException("Call not found or access denied");
 
             call.Status = callStatus;
-            call.CallDuration = DateTime.UtcNow - createdDate;
 
-            await _callRepository.CreateOrUpdateCallAsync(callId, call);
+            if (createdDate.HasValue)
+            {
+                call.CallDuration = DateTime.UtcNow - createdDate.Value;
+            }
 
-            return new Dictionary<string, Call> { { callId, call } };
+            await _callRepository.UpdateCallAsync(call);
+
+            var result = new Dictionary<string, Call>
+            {
+                { call.Id.ToString(), call }
+            };
+
+            return result;
         }
 
-
-
-        /// <summary>
-        /// Kullanıcının belirli bir çağrıyı silmesini sağlar.
-        /// </summary>
-        /// <param name="userId">Çağrıyı silen kullanıcının kimliği.</param>
-        /// <param name="callId">Silinecek çağrının kimliği.</param>
-        /// <returns>Asenkron işlemi temsil eden bir <see cref="Task"/> nesnesi.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının çağrı üzerinde yetkisi yoksa fırlatılır.</exception>
         public async Task DeleteCallAsync(string userId, string callId)
         {
-            FieldValidationHelper.ValidateRequiredFields((callId, "callId"));
+            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            if (call == null || !call.Participants.Contains(userId))
+                throw new NotFoundException("Call not found or access denied");
 
-            var call = await _callRepository.GetCallByIdAsync(callId) ?? throw new NotFoundException("Çağrı bulunamadı");
+            var deletedFor = call.DeletedFor;
+            deletedFor[userId] = DateTime.UtcNow;
 
-            if (!call.Participants.Contains(userId))
-            {
-                throw new ForbiddenException("Çağrı üzerinde yetkiniz yok.");
-            }
-
-            call.DeletedFor.Add(userId, DateTime.UtcNow);
-
-            await _callRepository.CreateOrUpdateCallAsync(callId, call);
+            call.DeletedFor = deletedFor;
+            await _callRepository.UpdateCallAsync(call);
         }
 
-
-
-        /// <summary>
-        /// Belirli bir çağrıya katılan kullanıcıların kimliklerini döndürür.
-        /// </summary>
-        /// <param name="userId">Kullanıcının kimliği.</param>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <returns>Çağrıya katılan kullanıcıların kimlik listesi.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının çağrı üzerinde yetkisi yoksa fırlatılır.</exception>
         public async Task<List<string>> GetCallParticipantsAsync(string userId, string callId)
         {
-            var callParticipants = await _callRepository.GetCallParticipantsByIdAsync(callId) ?? throw new NotFoundException("Çağrı bulunamadı");
+            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            if (call == null || !call.Participants.Contains(userId))
+                throw new NotFoundException("Call not found or access denied");
 
-            if (!callParticipants.Contains(userId))
-            {
-                throw new ForbiddenException("Çağrı üzerinde yetkiniz yok.");
-            }
-
-            return callParticipants;
+            return await _callRepository.GetCallParticipantsByIdAsync(Guid.Parse(callId));
         }
 
-
-        /// <summary>
-        /// Kullanıcının çağrı geçmişini getirir.
-        /// </summary>
-        /// <param name="userId">Kullanıcının kimliği.</param>
-        /// <returns>Çağrı geçmişi ve alıcı kimliklerini içeren bir tuple döndürür.</returns>
         public async Task<(Dictionary<string, Dictionary<string, Call>>, List<string>)> GetCallLogs(string userId)
         {
-            var callSnapshot = await _callRepository.GetCallsAsync();
+            var userCalls = await _callRepository.GetUserCallsAsync(userId);
 
-            var userCalls = callSnapshot
-                .Where(call =>
-                    call.Object.Participants.Contains(userId)
-                    &&
-                    !call.Object.DeletedFor!.ContainsKey(userId)
-                )
-                .OrderBy(call => call.Object.CreatedDate)
-                .ToDictionary(
-                    call => call.Key,
-                    call => call.Object
-                );
+            // Filter out calls that are deleted for this user
+            var visibleCalls = userCalls.Where(c => !c.DeletedFor.ContainsKey(userId)).ToList();
 
-            var callRecipientIds = userCalls
-                .SelectMany(call => call.Value.Participants)
-                .Where(participantId => !participantId.Equals(userId))
-                .ToList();
-
-
-
-            return (new Dictionary<string, Dictionary<string, Call>>
+            var callDict = visibleCalls.ToDictionary(c => c.Id.ToString(), c => c);
+            var result = new Dictionary<string, Dictionary<string, Call>>
             {
-                { "Call", userCalls },
-            },
-            callRecipientIds
-            );
+                { "calls", callDict }
+            };
+
+            var participants = visibleCalls.SelectMany(c => c.Participants).Distinct().Where(p => p != userId).ToList();
+
+            return (result, participants);
         }
 
-
-
-        /// <summary>
-        /// Kullanıcının belirli bir çağrısını getirir.
-        /// </summary>
-        /// <param name="userId">Çağrıyı sorgulayan kullanıcının kimliği.</param>
-        /// <param name="callId">Çağrı kimliği.</param>
-        /// <returns>Çağrı nesnesi.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
         public async Task<Call> GetCallAsync(string userId, string callId)
         {
-            var call = await _callRepository.GetCallByIdAsync(callId) ?? throw new NotFoundException("Çağrı bulunamadı");
+            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            if (call == null || !call.Participants.Contains(userId))
+                throw new NotFoundException("Call not found or access denied");
 
             return call;
         }

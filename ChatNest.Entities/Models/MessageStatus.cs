@@ -4,9 +4,9 @@
     /// Mesajın gönderim, teslim ve okunma durumlarını tutan sınıf.
     /// Her durum için ilgili tarih bilgilerini içerir.
     /// </summary>
-    public sealed class MessageStatus
+    public class MessageStatus
     {
-        public required Dictionary<string, DateTime> Sent { get; set; }
+        public Dictionary<string, DateTime> Sent { get; set; } = [];
 
         public Dictionary<string, DateTime> Delivered { get; set; } = [];
 

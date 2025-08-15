@@ -2,12 +2,8 @@
 
 namespace ChatNest.DataAccess.Configurations
 {
-    /// <summary>
-    /// Hugging Face API entegrasyonu için yapılandırma sınıfıdır.
-    /// </summary>
     public class HuggingFaceConfig
-    {
-        /// <summary>Hugging Face API anahtarını içerir.</summary>
+    {        /// <summary>Hugging Face API anahtarını içerir.</summary>
         public string ApiKey { get; }
 
 

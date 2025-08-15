@@ -14,5 +14,6 @@ namespace ChatNest.Shared.DTOs.Request
         [Required(ErrorMessage = "Lütfen bir propmt giriniz.")]
         [StringLength(1000, MinimumLength = 2, ErrorMessage = "Prompt en az 2, en fazla 1000 karakter olmalıdır.")]
         public string Prompt { get; init; }
+        public string? Model { get; set; }
     }
 }

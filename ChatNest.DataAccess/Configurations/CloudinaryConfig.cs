@@ -1,23 +1,11 @@
 ﻿using CloudinaryDotNet;
 using Microsoft.Extensions.Configuration;
 
-
 namespace ChatNest.DataAccess.Configurations
 {
-    /// <summary>
-    /// Cloudinary servisi için yapılandırma ayarlarını yönetir.
-    /// </summary>
+
     public class CloudinaryConfig
     {
-        /// <summary>Cloudinary servisiyle iletişim kurmak için kullanılan nesnedir.</summary>
-        public Cloudinary Cloudinary { get; }
-
-
-
-        /// <summary>
-        /// Cloudinary yapılandırmasını belirtilen <see cref="IConfiguration"/> nesnesine göre oluşturur.
-        /// </summary>
-        /// <param name="configuration">Uygulamanın yapılandırma ayarlarını içeren <see cref="IConfiguration"/> nesnesi.</param>
         public CloudinaryConfig(IConfiguration configuration)
         {
             var cloudName = configuration["Cloudinary:cloudName"];
@@ -35,5 +23,9 @@ namespace ChatNest.DataAccess.Configurations
                 Api = { Secure = true }
             };
         }
+        public string CloudName { get; set; } = string.Empty;
+        public string ApiKey { get; set; } = string.Empty;
+        public string ApiSecret { get; set; } = string.Empty;
+        public CloudinaryDotNet.Cloudinary Cloudinary { get; set; } = null!;
     }
 }

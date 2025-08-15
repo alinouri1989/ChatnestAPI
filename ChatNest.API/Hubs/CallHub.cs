@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.SignalR;
-using ChatNest.Entities.Enums;
+﻿using ChatNest.Entities.Enums;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 
 namespace ChatNest.API.Hubs
@@ -73,7 +73,7 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var (calls,_) = await _callService.GetCallLogs(UserId);
+            var (calls, _) = await _callService.GetCallLogs(UserId);
 
             foreach (var call in calls.Values.First())
             {

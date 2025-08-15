@@ -10,6 +10,8 @@ namespace ChatNest.Shared.DTOs.Request
     {
         [Required(ErrorMessage = "Lütfen bir fotoğraf yükleyiniz.")]
         public string ProfilePhoto { get; init; }
+        public byte[] ProfilePhotoAsBytes { get; set; } = Array.Empty<byte>();
+
     }
 
 

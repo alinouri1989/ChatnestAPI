@@ -1,76 +1,62 @@
-﻿using Firebase.Auth;
-using Microsoft.Extensions.Options;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Configurations;
+﻿using ChatNest.DataAccess.Abstract;
+using ChatNest.Entities.Models;
+using Microsoft.AspNetCore.Identity;
 
 namespace ChatNest.DataAccess.Concrete
 {
-    /// <summary>
-    /// Firebase kimlik doğrulama (Auth) işlemlerini yöneten depo (repository) sınıfı.
-    /// </summary>
     public sealed class AuthRepository : IAuthRepository
     {
-        private readonly FirebaseAuthClient _authClient;
+        private readonly UserManager<User> _userManager;
+        private readonly SignInManager<User> _signInManager;
 
-
-
-        /// <summary>
-        /// <see cref="AuthRepository"/> sınıfını belirtilen Firebase yapılandırması ile başlatır.
-        /// </summary>
-        /// <param name="firebaseConfig">Firebase kimlik doğrulama istemcisini içeren yapılandırma.</param>
-        public AuthRepository(FirebaseConfig firebaseConfig)
+        public AuthRepository(UserManager<User> userManager, SignInManager<User> signInManager)
         {
-            _authClient = firebaseConfig.AuthClient;
+            _userManager = userManager;
+            _signInManager = signInManager;
         }
 
-
-
-        /// <summary>
-        /// Belirtilen e-posta, parola ve görünen ad ile yeni bir kullanıcı oluşturur.
-        /// </summary>
-        /// <param name="email">Kullanıcının e-posta adresi.</param>
-        /// <param name="password">Kullanıcının parolası.</param>
-        /// <param name="displayName">Kullanıcının görünen adı.</param>
-        /// <returns>Oluşturulan kullanıcının kimlik bilgileri.</returns>
-        public async Task<UserCredential> CreateUserAsync(string email, string password, string displayName)
+        public async Task<IdentityResult> CreateUserAsync(User user, string password)
         {
-            return await _authClient.CreateUserWithEmailAndPasswordAsync(email, password, displayName);
+            return await _userManager.CreateAsync(user, password);
         }
 
-
-
-        /// <summary>
-        /// E-posta ve parola ile oturum açar.
-        /// </summary>
-        /// <param name="email">Kullanıcının e-posta adresi.</param>
-        /// <param name="password">Kullanıcının parolası.</param>
-        /// <returns>Oturum açan kullanıcının kimlik bilgileri.</returns>
-        public async Task<UserCredential> SignInWithEmailAsync(string email, string password)
+        public async Task<SignInResult> SignInWithEmailAsync(string email, string password)
         {
-            return await _authClient.SignInWithEmailAndPasswordAsync(email, password);
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null) return SignInResult.Failed;
+
+            return await _signInManager.PasswordSignInAsync(user, password, false, false);
         }
 
-
-
-        /// <summary>
-        /// Kullanıcının parolasını değiştirir.
-        /// </summary>
-        /// <param name="userCredential">Kimlik doğrulama bilgilerini içeren kullanıcı.</param>
-        /// <param name="newPasswordAgain">Yeni parola.</param>
-        public async Task ChangePasswordAsync(UserCredential userCredential, string newPasswordAgain)
+        public async Task<IdentityResult> ChangePasswordAsync(User user, string currentPassword, string newPassword)
         {
-            await userCredential.User.ChangePasswordAsync(newPasswordAgain);
+            return await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
         }
 
-
-
-        /// <summary>
-        /// Belirtilen e-posta adresine parola sıfırlama bağlantısı gönderir.
-        /// </summary>
-        /// <param name="email">Kullanıcının e-posta adresi.</param>
-        public async Task ResetEmailPasswordAsync(string email)
+        public async Task<IdentityResult> ResetPasswordAsync(string email)
         {
-            await _authClient.ResetEmailPasswordAsync(email);
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null) return IdentityResult.Failed();
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            // Here you would typically send an email with the reset link
+            // For now, we'll just return success
+            return IdentityResult.Success;
+        }
+
+        public async Task<User?> FindByEmailAsync(string email)
+        {
+            return await _userManager.FindByEmailAsync(email);
+        }
+
+        public async Task<User?> FindByIdAsync(string userId)
+        {
+            return await _userManager.FindByIdAsync(userId);
+        }
+
+        public async Task SignOutAsync()
+        {
+            await _signInManager.SignOutAsync();
         }
     }
 }

@@ -1,93 +1,87 @@
-﻿using Firebase.Database;
-using Firebase.Database.Query;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Configurations;
+﻿using ChatNest.DataAccess.Abstract;
+using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
-
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatNest.DataAccess.Concrete
 {
-    /// <summary>
-    /// Firebase üzerinde grup (Group) yönetimi işlemlerini gerçekleştiren repository sınıfı.
-    /// </summary>
     public sealed class GroupRepository : IGroupRepository
     {
-        private readonly FirebaseClient _databaseClient;
+        private readonly ChatNestDbContext _context;
 
-
-
-        /// <summary>
-        /// <see cref="GroupRepository"/> sınıfının yeni bir örneğini oluşturur.
-        /// </summary>
-        /// <param name="firebaseConfig">Firebase yapılandırma bilgilerini içeren nesne.</param>
-        public GroupRepository(FirebaseConfig firebaseConfig)
+        public GroupRepository(ChatNestDbContext context)
         {
-            _databaseClient = firebaseConfig.DatabaseClient;
+            _context = context;
         }
 
-
-
-        /// <summary>
-        /// Belirtilen grup kimliği ile yeni bir grup oluşturur veya mevcut grubu günceller.
-        /// </summary>
-        /// <param name="groupId">Grup kimliği.</param>
-        /// <param name="group">Grup bilgilerini içeren nesne.</param>
-        public async Task CreateOrUpdateGroupAsync(string groupId, Group group)
+        public async Task CreateOrUpdateGroupAsync(Group group)
         {
-            await _databaseClient.Child("Groups").Child(groupId).PutAsync(group);
+            if (group.Id == Guid.Empty)
+            {
+                group.Id = Guid.NewGuid();
+                group.CreatedDate = DateTime.UtcNow;
+                _context.Groups.Add(group);
+            }
+            else
+            {
+                _context.Groups.Update(group);
+            }
+
+            await _context.SaveChangesAsync();
         }
 
-
-
-        /// <summary>
-        /// Firebase veritabanındaki tüm grupları getirir.
-        /// </summary>
-        /// <returns>Grup nesnelerinin koleksiyonu.</returns>
-        public async Task<IReadOnlyCollection<FirebaseObject<Group>>> GetAllGroupAsync()
+        public async Task<IEnumerable<Group>> GetAllGroupsAsync()
         {
-            return await _databaseClient.Child("Groups").OnceAsync<Group>();
+            return await _context.Groups
+                .Include(g => g.Creator)
+                .ToListAsync();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen grup kimliğine göre grubu getirir.
-        /// </summary>
-        /// <param name="groupId">Grup kimliği.</param>
-        /// <returns>Grup bilgilerini içeren nesne.</returns>
-        public async Task<Group> GetGroupByIdAsync(string groupId)
+        public async Task<Group?> GetGroupByIdAsync(Guid groupId)
         {
-            return await _databaseClient.Child("Groups").Child(groupId).OnceSingleAsync<Group>();
+            return await _context.Groups
+                .Include(g => g.Creator)
+                .FirstOrDefaultAsync(g => g.Id == groupId);
         }
 
-
-
-        /// <summary>
-        /// Belirtilen grup kimliğine göre grup katılımcılarının kimliklerini getirir.
-        /// </summary>
-        /// <param name="groupId">Grup kimliği.</param>
-        /// <returns>Katılımcıların kimliklerini içeren liste.</returns>
-        public async Task<List<string>> GetGroupParticipantsIdsAsync(string groupId)
+        public async Task<List<string>> GetGroupParticipantsIdsAsync(Guid groupId)
         {
-            var groupParticipants = await _databaseClient.Child("Groups").Child(groupId).Child("Participants").OnceAsync<object>();
-
-            return groupParticipants
-                .Where(x => !x.Object.Equals(GroupParticipant.Former))
-                .Select(x => x.Key)
-                .ToList();
+            var group = await _context.Groups.FindAsync(groupId);
+            return group?.Participants?.Where(p => p.Value != GroupParticipant.Former)
+                                     .Select(p => p.Key)
+                                     .ToList() ?? new List<string>();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen grup kimliğine sahip grubun katılımcılarını günceller.
-        /// </summary>
-        /// <param name="groupId">Grup kimliği.</param>
-        /// <param name="groupParticipants">Güncellenmiş grup katılımcıları listesi.</param>
-        public async Task UpdateGroupParticipantsAsync(string groupId, Dictionary<string, GroupParticipant> groupParticipants)
+        public async Task UpdateGroupParticipantsAsync(Guid groupId, Dictionary<string, GroupParticipant> groupParticipants)
         {
-            await _databaseClient.Child("Groups").Child(groupId).Child("Participants").PutAsync(groupParticipants);
+            var group = await _context.Groups.FindAsync(groupId);
+            if (group != null)
+            {
+                group.Participants = groupParticipants;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<bool> DeleteGroupAsync(Guid groupId)
+        {
+            var group = await _context.Groups.FindAsync(groupId);
+            if (group != null)
+            {
+                _context.Groups.Remove(group);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<IEnumerable<Group>> GetUserGroupsAsync(string userId)
+        {
+            return await _context.Groups
+                .Where(g => g.Participants.ContainsKey(userId) &&
+                           g.Participants[userId] != GroupParticipant.Former)
+                .Include(g => g.Creator)
+                .ToListAsync();
         }
     }
 }

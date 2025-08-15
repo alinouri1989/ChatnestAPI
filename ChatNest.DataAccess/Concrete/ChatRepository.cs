@@ -1,105 +1,91 @@
-﻿using Firebase.Database;
-using Firebase.Database.Query;
-using Microsoft.Extensions.Options;
-using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Configurations;
+﻿using ChatNest.DataAccess.Abstract;
+using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatNest.DataAccess.Concrete
 {
-    /// <summary>
-    /// Firebase veritabanında sohbet (Chat) işlemlerini yöneten repository (repository) sınıfı.
-    /// </summary>
     public sealed class ChatRepository : IChatRepository
     {
-        private readonly FirebaseClient _databaseClient;
+        private readonly ChatNestDbContext _context;
 
-
-
-        /// <summary>
-        /// Firebase veritabanı istemcisi ile bağlantı kurar.
-        /// </summary>
-        /// <param name="firebaseConfig">Firebase yapılandırma ayarları.</param>
-        public ChatRepository(FirebaseConfig firebaseConfig)
+        public ChatRepository(ChatNestDbContext context)
         {
-            _databaseClient = firebaseConfig.DatabaseClient;
+            _context = context;
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbet türüne göre tüm sohbetleri getirir.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü (örneğin, grup, bireysel vb.).</param>
-        /// <returns>Sohbet nesnelerinin koleksiyonu.</returns>
-        public async Task<IReadOnlyCollection<FirebaseObject<Chat>>> GetChatsAsync(string chatType)
+        public async Task<IEnumerable<Chat>> GetChatsAsync(string chatType)
         {
-            return await _databaseClient.Child("Chats").Child(chatType).OnceAsync<Chat>();
+            return await _context.Chats
+                .Where(c => c.ChatType == chatType)
+                .Include(c => c.Messages)
+                .ToListAsync();
         }
 
-
-
-        /// <summary>
-        /// Yeni bir sohbet oluşturur veya mevcut sohbeti günceller.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbet kimliği.</param>
-        /// <param name="chat">Sohbet nesnesi.</param>
-        public async Task CreateChatAsync(string chatType, string chatId, Chat chat)
+        public async Task CreateChatAsync(Chat chat)
         {
-            await _databaseClient.Child("Chats").Child(chatType).Child(chatId).PutAsync(chat);
+            chat.Id = Guid.NewGuid();
+            chat.CreatedDate = DateTime.UtcNow;
+
+            _context.Chats.Add(chat);
+            await _context.SaveChangesAsync();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbet kimliği ve türüne göre sohbeti getirir.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbet kimliği.</param>
-        /// <returns>Sohbet nesnesi.</returns>
-        public async Task<Chat> GetChatByIdAsync(string chatType, string chatId)
+        public async Task<Chat?> GetChatByIdAsync(Guid chatId)
         {
-            return await _databaseClient.Child("Chats").Child(chatType).Child(chatId).OnceSingleAsync<Chat>();
+            return await _context.Chats
+                .Include(c => c.Messages)
+                .FirstOrDefaultAsync(c => c.Id == chatId);
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbetin katılımcılarını getirir.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbet kimliği.</param>
-        /// <returns>Katılımcıların kimliklerini içeren liste.</returns>
-        public async Task<List<string>> GetChatParticipantsByIdAsync(string chatType, string chatId)
+        public async Task<List<string>> GetChatParticipantsByIdAsync(Guid chatId)
         {
-            return await _databaseClient.Child("Chats").Child(chatType).Child(chatId).Child("Participants").OnceSingleAsync<List<string>>();
+            var chat = await _context.Chats.FindAsync(chatId);
+            return chat?.Participants ?? new List<string>();
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbetin arşivlenmiş kişiler bilgisini günceller.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbet kimliği.</param>
-        /// <param name="archivedFor">Arşivlenmiş kişilerin bilgilerinin yer aldığı sözlük.</param>
-        public async Task UpdateChatArchivedForAsync(string chatType, string chatId, Dictionary<string, DateTime> archivedFor)
+        public async Task UpdateChatArchivedForAsync(Guid chatId, Dictionary<string, DateTime> archivedFor)
         {
-            await _databaseClient.Child("Chats").Child(chatType).Child(chatId).PatchAsync(new { ArchivedFor = archivedFor });
+            var chat = await _context.Chats.FindAsync(chatId);
+            if (chat != null)
+            {
+                chat.ArchivedFor = archivedFor;
+                await _context.SaveChangesAsync();
+            }
         }
 
-
-
-        /// <summary>
-        /// Belirtilen sohbetin mesajlarını günceller.
-        /// </summary>
-        /// <param name="chatType">Sohbet türü.</param>
-        /// <param name="chatId">Sohbet kimliği.</param>
-        /// <param name="messages">Güncellenmiş mesajların yer aldığı sözlük.</param>
-        public async Task UpdateChatMessageAsync(string chatType, string chatId, Dictionary<string, Message> messages)
+        public async Task UpdateChatAsync(Chat chat)
         {
-            await _databaseClient.Child("Chats").Child(chatType).Child(chatId).Child("Messages").PutAsync(messages);
+            _context.Chats.Update(chat);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> DeleteChatAsync(Guid chatId)
+        {
+            var chat = await _context.Chats.FindAsync(chatId);
+            if (chat != null)
+            {
+                _context.Chats.Remove(chat);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<Chat?> GetChatByParticipantsAsync(List<string> participants)
+        {
+            return await _context.Chats
+                .FirstOrDefaultAsync(c => c.Participants.Count == participants.Count &&
+                                         participants.All(p => c.Participants.Contains(p)));
+        }
+
+        public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId)
+        {
+            return await _context.Chats
+                .Where(c => c.Participants.Contains(userId))
+                .Include(c => c.Messages)
+                .OrderByDescending(c => c.CreatedDate)
+                .ToListAsync();
         }
     }
 }

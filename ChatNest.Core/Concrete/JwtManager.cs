@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using ChatNest.Core.Abstract;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using ChatNest.Core.Abstract;
 using System.Security.Claims;
 using System.Text;
 
@@ -30,10 +30,10 @@ namespace ChatNest.Core.Concrete
         /// <param name="configuration">JWT ayarlarını içeren <see cref="IConfiguration"/> nesnesi.</param>
         public JwtManager(IConfiguration configuration)
         {
-            _secret = configuration["JwtSettings:secret"];
-            _issuer = configuration["JwtSettings:issuer"];
-            _audience = configuration["JwtSettings:audience"];
-            _expiryInDays = byte.Parse(configuration["JwtSettings:expiryInDays"]!);
+            _secret = configuration["JWT:secret"];
+            _issuer = configuration["JWT:issuer"];
+            _audience = configuration["JWT:audience"];
+            _expiryInDays = byte.Parse(configuration["JWT:expiryInDays"]!);
         }
 
 
@@ -51,7 +51,7 @@ namespace ChatNest.Core.Concrete
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, userId),
+                new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };
