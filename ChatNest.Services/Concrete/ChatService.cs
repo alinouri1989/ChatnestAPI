@@ -54,39 +54,99 @@ namespace ChatNest.Services.Concrete
 
         public async Task<(Dictionary<string, Dictionary<string, Chat>>, List<string>, List<string>)> GetAllChatsAsync(string userId)
         {
-            var userChats = await _chatRepository.GetUserChatsAsync(userId);
-            var result = new Dictionary<string, Dictionary<string, Chat>>();
-            var individualParticipants = new List<string>();
-            var groupParticipants = new List<string>();
-
-            var individualChats = userChats.Where(c => c.ChatType == "Individual").ToDictionary(c => c.Id.ToString(), c => c);
-            var groupChats = userChats.Where(c => c.ChatType == "Group").ToDictionary(c => c.Id.ToString(), c => c);
-
-            if (individualChats.Any())
+            try
             {
-                result.Add("Individual", individualChats);
-                // Get participants from junction table
-                foreach (var chat in individualChats.Values)
-                {
-                    var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
-                    individualParticipants.AddRange(participants.Where(p => p != userId));
-                }
-                individualParticipants = individualParticipants.Distinct().ToList();
-            }
+                var userChats = await _chatRepository.GetUserChatsAsync(userId);
+                var result = new Dictionary<string, Dictionary<string, Chat>>();
+                var individualParticipants = new List<string>();
+                var groupParticipants = new List<string>();
 
-            if (groupChats.Any())
+                // Ensure we always have valid collections
+                if (userChats == null || !userChats.Any())
+                {
+                    return (result, individualParticipants, groupParticipants);
+                }
+
+                var individualChats = userChats.Where(c => c.ChatType == "Individual")
+                                             .ToDictionary(c => c.Id.ToString(), c => c);
+
+                var groupChats = userChats.Where(c => c.ChatType == "Group")
+                                         .ToDictionary(c => c.Id.ToString(), c => c);
+
+                // Always add the keys, even if empty
+                if (individualChats.Any())
+                {
+                    result.Add("Individual", individualChats);
+
+                    // Get participants from junction table for individual chats
+                    foreach (var chat in individualChats.Values)
+                    {
+                        try
+                        {
+                            var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
+                            if (participants != null)
+                            {
+                                individualParticipants.AddRange(participants.Where(p => p != userId));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log the exception but continue processing
+                            Console.WriteLine($"Error getting participants for chat {chat.Id}: {ex.Message}");
+                        }
+                    }
+                    individualParticipants = individualParticipants.Distinct().ToList();
+                }
+                else
+                {
+                    // Add empty Individual section
+                    result.Add("Individual", new Dictionary<string, Chat>());
+                }
+
+                if (groupChats.Any())
+                {
+                    result.Add("Group", groupChats);
+
+                    // Get participants from junction table for group chats
+                    foreach (var chat in groupChats.Values)
+                    {
+                        try
+                        {
+                            var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
+                            if (participants != null)
+                            {
+                                groupParticipants.AddRange(participants.Where(p => p != userId));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log the exception but continue processing
+                            Console.WriteLine($"Error getting participants for chat {chat.Id}: {ex.Message}");
+                        }
+                    }
+                    groupParticipants = groupParticipants.Distinct().ToList();
+                }
+                else
+                {
+                    // Add empty Group section
+                    result.Add("Group", new Dictionary<string, Chat>());
+                }
+
+                return (result, individualParticipants, groupParticipants);
+            }
+            catch (Exception ex)
             {
-                result.Add("Group", groupChats);
-                // Get participants from junction table
-                foreach (var chat in groupChats.Values)
-                {
-                    var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
-                    groupParticipants.AddRange(participants.Where(p => p != userId));
-                }
-                groupParticipants = groupParticipants.Distinct().ToList();
-            }
+                // Log the exception and return empty but valid structure
+                Console.WriteLine($"Error in GetAllChatsAsync: {ex.Message}");
 
-            return (result, individualParticipants, groupParticipants);
+                var emptyResult = new Dictionary<string, Dictionary<string, Chat>>
+        {
+            { "Individual", new Dictionary<string, Chat>() },
+            { "Group", new Dictionary<string, Chat>() }
+        };
+
+                return (emptyResult, new List<string>(), new List<string>());
+            }
         }
 
         public async Task<Dictionary<string, Dictionary<string, Chat>>> ClearChatAsync(string userId, string chatType, string chatId)

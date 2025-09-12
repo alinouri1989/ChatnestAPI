@@ -108,20 +108,75 @@ namespace ChatNest.API.Hubs
             {
                 var (chats, chatsRecipientIds, userGroupIds) = await _chatService.GetAllChatsAsync(UserId);
 
-                var recipientProfilesTask = _userService.GetRecipientProfilesAsync(chatsRecipientIds);
-                var groupProfilesTask = _groupService.GetGroupProfilesAsync(userGroupIds);
+                // Ensure we always send valid data
+                var safeChats = chats ?? CreateEmptyChatsStructure();
+                var safeRecipientIds = chatsRecipientIds ?? new List<string>();
+                var safeGroupIds = userGroupIds ?? new List<string>();
 
-                var recipientProfiles = await recipientProfilesTask;
-                var groupProfiles = await groupProfilesTask;
+                // Get profiles
+                var recipientProfiles = await GetRecipientProfilesSafely(safeRecipientIds);
+                var groupProfiles = await GetGroupProfilesSafely(safeGroupIds);
 
-                await Clients.Caller.SendAsync("ReceiveInitialChats", chats);
+                // Send the data
+                await Clients.Caller.SendAsync("ReceiveInitialChats", safeChats);
                 await Clients.Caller.SendAsync("ReceiveInitialGroupProfiles", groupProfiles);
                 await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", recipientProfiles);
             }
             catch (Exception ex)
             {
+                await SendEmptyDataToClient();
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
+        }
+
+        private Dictionary<string, Dictionary<string, Chat>> CreateEmptyChatsStructure()
+        {
+            return new Dictionary<string, Dictionary<string, Chat>>
+                {
+                    { "Individual", new Dictionary<string, Chat>() },
+                    { "Group", new Dictionary<string, Chat>() }
+                };
+        }
+
+        private async Task<Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>> GetRecipientProfilesSafely(List<string> recipientIds)
+        {
+            try
+            {
+                return recipientIds.Any()
+                    ? await _userService.GetRecipientProfilesAsync(recipientIds)
+                    : new Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting recipient profiles: {ex.Message}");
+                return new Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>();
+            }
+        }
+
+        private async Task<Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>> GetGroupProfilesSafely(List<string> groupIds)
+        {
+            try
+            {
+                return groupIds.Any()
+                    ? await _groupService.GetGroupProfilesAsync(groupIds)
+                    : new Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting group profiles: {ex.Message}");
+                return new Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>();
+            }
+        }
+
+        private async Task SendEmptyDataToClient()
+        {
+            var emptyChats = CreateEmptyChatsStructure();
+            var emptyRecipientProfiles = new Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>();
+            var emptyGroupProfiles = new Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>();
+
+            await Clients.Caller.SendAsync("ReceiveInitialChats", emptyChats);
+            await Clients.Caller.SendAsync("ReceiveInitialGroupProfiles", emptyGroupProfiles);
+            await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", emptyRecipientProfiles);
         }
 
         /// <summary>
