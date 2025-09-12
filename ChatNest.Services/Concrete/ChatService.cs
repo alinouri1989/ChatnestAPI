@@ -1,7 +1,6 @@
 ﻿using AutoMapper;
 using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Models;
-using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 
 namespace ChatNest.Services.Concrete
@@ -23,23 +22,34 @@ namespace ChatNest.Services.Concrete
         {
             var participants = new List<string> { userId, recipientId };
 
-            // Check if chat already exists
+            // Check if chat already exists by checking participants
             var existingChat = await _chatRepository.GetChatByParticipantsAsync(participants);
             if (existingChat != null)
             {
                 return new Dictionary<string, Chat> { { existingChat.Id.ToString(), existingChat } };
             }
 
+            // Create new chat
             var chat = new Chat
             {
+                Id = Guid.NewGuid(),
                 ChatType = chatType,
-                Participants = participants,
                 CreatedDate = DateTime.UtcNow
             };
 
-            await _chatRepository.CreateChatAsync(chat);
+            // Create the chat first
+            await _chatRepository.AddChatAsync(chat);
 
-            return new Dictionary<string, Chat> { { chat.Id.ToString(), chat } };
+            // Add participants to the chat
+            foreach (var participantId in participants)
+            {
+                await _chatRepository.AddParticipantAsync(chat.Id, participantId);
+            }
+
+            // Reload chat with participants
+            var createdChat = await _chatRepository.GetChatByIdAsync(chat.Id);
+
+            return new Dictionary<string, Chat> { { chat.Id.ToString(), createdChat } };
         }
 
         public async Task<(Dictionary<string, Dictionary<string, Chat>>, List<string>, List<string>)> GetAllChatsAsync(string userId)
@@ -55,13 +65,25 @@ namespace ChatNest.Services.Concrete
             if (individualChats.Any())
             {
                 result.Add("Individual", individualChats);
-                individualParticipants.AddRange(individualChats.Values.SelectMany(c => c.Participants).Distinct().Where(p => p != userId));
+                // Get participants from junction table
+                foreach (var chat in individualChats.Values)
+                {
+                    var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
+                    individualParticipants.AddRange(participants.Where(p => p != userId));
+                }
+                individualParticipants = individualParticipants.Distinct().ToList();
             }
 
             if (groupChats.Any())
             {
                 result.Add("Group", groupChats);
-                groupParticipants.AddRange(groupChats.Values.SelectMany(c => c.Participants).Distinct().Where(p => p != userId));
+                // Get participants from junction table
+                foreach (var chat in groupChats.Values)
+                {
+                    var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
+                    groupParticipants.AddRange(participants.Where(p => p != userId));
+                }
+                groupParticipants = groupParticipants.Distinct().ToList();
             }
 
             return (result, individualParticipants, groupParticipants);
@@ -70,17 +92,23 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, Dictionary<string, Chat>>> ClearChatAsync(string userId, string chatType, string chatId)
         {
             var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
-            if (chat == null || !chat.Participants.Contains(userId))
-                throw new NotFoundException("Chat not found or access denied");
+            if (chat == null)
+                throw new NotFoundException("Chat not found");
+
+            // Check if user is participant
+            var participants = await _chatRepository.GetChatParticipantsAsync(Guid.Parse(chatId));
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             // Clear messages for this user (mark them as deleted)
             // This would require updating the message repository to mark messages as deleted for this user
             // For now, we'll just return the updated chat structure
 
-            var updatedChats = await _chatRepository.GetChatsAsync(chatType);
+            var updatedChats = await _chatRepository.GetChatsByUserIdAsync(userId);
+            var filteredChats = updatedChats.Where(c => c.ChatType == chatType);
             var result = new Dictionary<string, Dictionary<string, Chat>>
             {
-                { chatType, updatedChats.ToDictionary(c => c.Id.ToString(), c => c) }
+                { chatType, filteredChats.ToDictionary(c => c.Id.ToString(), c => c) }
             };
 
             return result;
@@ -89,13 +117,19 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> ArchiveIndividualChatAsync(string userId, string chatId)
         {
             var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
-            if (chat == null || !chat.Participants.Contains(userId))
-                throw new NotFoundException("Chat not found or access denied");
+            if (chat == null)
+                throw new NotFoundException("Chat not found");
+
+            // Check if user is participant
+            var participants = await _chatRepository.GetChatParticipantsAsync(Guid.Parse(chatId));
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             var archivedFor = chat.ArchivedFor;
             archivedFor[userId] = DateTime.UtcNow;
+            chat.ArchivedFor = archivedFor;
 
-            await _chatRepository.UpdateChatArchivedForAsync(Guid.Parse(chatId), archivedFor);
+            await _chatRepository.UpdateChatAsync(chat);
 
             var result = new Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>
             {
@@ -108,13 +142,19 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> UnarchiveIndividualChatAsync(string userId, string chatId)
         {
             var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
-            if (chat == null || !chat.Participants.Contains(userId))
-                throw new NotFoundException("Chat not found or access denied");
+            if (chat == null)
+                throw new NotFoundException("Chat not found");
+
+            // Check if user is participant
+            var participants = await _chatRepository.GetChatParticipantsAsync(Guid.Parse(chatId));
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             var archivedFor = chat.ArchivedFor;
             archivedFor.Remove(userId);
+            chat.ArchivedFor = archivedFor;
 
-            await _chatRepository.UpdateChatArchivedForAsync(Guid.Parse(chatId), archivedFor);
+            await _chatRepository.UpdateChatAsync(chat);
 
             var result = new Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>
             {
@@ -122,6 +162,22 @@ namespace ChatNest.Services.Concrete
             };
 
             return result;
+        }
+
+        // Add new helper methods
+        public async Task AddParticipantToChatAsync(string chatId, string userId)
+        {
+            await _chatRepository.AddParticipantAsync(Guid.Parse(chatId), userId);
+        }
+
+        public async Task RemoveParticipantFromChatAsync(string chatId, string userId)
+        {
+            await _chatRepository.RemoveParticipantAsync(Guid.Parse(chatId), userId);
+        }
+
+        public async Task<List<string>> GetChatParticipantsAsync(string chatId)
+        {
+            return await _chatRepository.GetChatParticipantsAsync(Guid.Parse(chatId));
         }
     }
 }

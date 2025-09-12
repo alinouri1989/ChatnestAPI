@@ -1,15 +1,15 @@
 ﻿using ChatNest.Entities.Models;
 
-namespace ChatNest.DataAccess.Abstract
+public interface ICallRepository
 {
-    public interface ICallRepository
-    {
-        Task<IEnumerable<Call>> GetCallsAsync();
-        Task CreateOrUpdateCallAsync(Call call);
-        Task<Call?> GetCallByIdAsync(Guid callId);
-        Task<List<string>> GetCallParticipantsByIdAsync(Guid callId);
-        Task UpdateCallAsync(Call call);
-        Task<bool> DeleteCallAsync(Guid callId);
-        Task<IEnumerable<Call>> GetUserCallsAsync(string userId);
-    }
+    Task<Call> AddCallAsync(Call call);
+    Task<Call?> GetCallByIdAsync(Guid id);
+    Task<List<Call>> GetCallsByUserIdAsync(string userId);
+    Task<IEnumerable<Call>> GetUserCallsAsync(string userId);
+    Task<Call> UpdateCallAsync(Call call);
+    Task DeleteCallAsync(Guid id);
+
+    // Add these new methods
+    Task AddParticipantAsync(Guid callId, string userId);
+    Task RemoveParticipantAsync(Guid callId, string userId);
 }

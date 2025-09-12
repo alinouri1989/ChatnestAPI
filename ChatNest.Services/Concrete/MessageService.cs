@@ -31,7 +31,7 @@ namespace ChatNest.Services.Concrete
             string userId, string chatId, string chatType, SendMessage dto)
         {
             var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
-            if (chat == null || !chat.Participants.Contains(userId))
+            if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
                 throw new NotFoundException("Chat not found or access denied");
 
             var message = new Message
@@ -88,7 +88,7 @@ namespace ChatNest.Services.Concrete
                 { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { message.Id.ToString(), message } } } } }
             };
 
-            return (result, chat.Participants);
+            return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
         }
 
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(
@@ -99,7 +99,7 @@ namespace ChatNest.Services.Concrete
                 throw new NotFoundException("Message not found");
 
             var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
-            if (chat == null || !chat.Participants.Contains(userId))
+            if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
                 throw new NotFoundException("Chat not found or access denied");
 
             if (deletionType == 1) // Delete for everyone (only sender can do this)
@@ -127,7 +127,7 @@ namespace ChatNest.Services.Concrete
                 };
             }
 
-            return (result, chat.Participants);
+            return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
         }
 
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(
@@ -138,7 +138,7 @@ namespace ChatNest.Services.Concrete
                 throw new NotFoundException("Message not found");
 
             var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
-            if (chat == null || !chat.Participants.Contains(userId))
+            if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
                 throw new NotFoundException("Chat not found or access denied");
 
             var statusUpdate = new Dictionary<string, DateTime> { { userId, DateTime.UtcNow } };
@@ -150,7 +150,7 @@ namespace ChatNest.Services.Concrete
                 { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage! } } } } }
             };
 
-            return (result, chat.Participants);
+            return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
         }
     }
 }

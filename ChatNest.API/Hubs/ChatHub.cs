@@ -145,7 +145,7 @@ namespace ChatNest.API.Hubs
                     var chatEntity = chat.Values.FirstOrDefault();
                     if (chatEntity != null)
                     {
-                        var chatParticipants = chatEntity.Participants;
+                        var chatParticipants = await _chatService.GetChatParticipantsAsync(chatEntity.Id.ToString());
 
                         // Send chat to all participants
                         var chatResponse = new Dictionary<string, Dictionary<string, Chat>> { { "Individual", chat } };
@@ -497,25 +497,12 @@ namespace ChatNest.API.Hubs
             try
             {
                 // Get chat participants to notify them
-                var (chats, _, _) = await _chatService.GetAllChatsAsync(UserId);
+                var chatParticipants = await _chatService.GetChatParticipantsAsync(chatId);
 
-                Chat? targetChat = null;
-                foreach (var chatType in chats.Values)
+                var otherParticipants = chatParticipants.Where(p => p != UserId);
+                foreach (var participant in otherParticipants)
                 {
-                    if (chatType.ContainsKey(chatId))
-                    {
-                        targetChat = chatType[chatId];
-                        break;
-                    }
-                }
-
-                if (targetChat != null)
-                {
-                    var otherParticipants = targetChat.Participants.Where(p => p != UserId);
-                    foreach (var participant in otherParticipants)
-                    {
-                        await Clients.User(participant).SendAsync("UserTyping", new { chatId, userId = UserId, isTyping });
-                    }
+                    await Clients.User(participant).SendAsync("UserTyping", new { chatId, userId = UserId, isTyping });
                 }
             }
             catch (Exception ex)

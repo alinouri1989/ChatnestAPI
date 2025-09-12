@@ -4,23 +4,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 
 namespace ChatNest.Entities.Models;
-
 public sealed class Call
 {
     [Key]
     public Guid Id { get; set; }
-
-    // Store as JSON string in database
-    public string ParticipantsJson { get; set; } = string.Empty;
-
-    [NotMapped]
-    public List<string> Participants
-    {
-        get => string.IsNullOrEmpty(ParticipantsJson) ?
-               new List<string>() :
-               JsonSerializer.Deserialize<List<string>>(ParticipantsJson) ?? new List<string>();
-        set => ParticipantsJson = JsonSerializer.Serialize(value);
-    }
 
     public CallType Type { get; set; }
     public CallStatus Status { get; set; }
@@ -43,7 +30,10 @@ public sealed class Call
 
     public DateTime CreatedDate { get; set; }
 
-    // Navigation property
+    // Navigation properties
     [ForeignKey("ChatId")]
     public Chat? Chat { get; set; }
+
+    // Add this navigation property
+    public ICollection<CallParticipant> CallParticipants { get; set; } = new List<CallParticipant>();
 }

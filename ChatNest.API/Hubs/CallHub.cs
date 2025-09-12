@@ -22,7 +22,7 @@ namespace ChatNest.API.Hubs
         /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
         /// </summary>
         /// <returns>شناسه منحصربه‌فرد کاربر فعلی.</returns>
-        /// <exception cref="NullReferenceException">
+        /// <exception cref="UnauthorizedAccessException">
         /// در صورتی که شناسه کاربر یافت نشود یا با مقدار null مواجه شود پرتاب می‌شود.
         /// </exception>
         private string UserId
@@ -30,9 +30,12 @@ namespace ChatNest.API.Hubs
             get
             {
                 var identity = Context?.User?.Identity as ClaimsIdentity;
-                return identity?
-                    .FindFirst(ClaimTypes.NameIdentifier)?
-                    .Value!;
+                var userId = identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrEmpty(userId))
+                    throw new UnauthorizedAccessException("User ID not found in token");
+
+                return userId;
             }
         }
 
@@ -54,7 +57,14 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public override async Task OnConnectedAsync()
         {
-            await base.OnConnectedAsync();
+            try
+            {
+                await base.OnConnectedAsync();
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("ConnectionError", new { message = "خطای اتصال به هاب تماس رخ داده است!", errorDetails = ex.Message });
+            }
         }
 
         /// <summary>
@@ -65,30 +75,53 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var (calls, _) = await _callService.GetCallLogs(UserId);
-
-            foreach (var call in calls.Values.First())
+            try
             {
-                if (call.Value.Status.Equals(CallStatus.Ongoing))
+                var (calls, _) = await _callService.GetCallLogsAsync(UserId);
+
+                foreach (var callCategory in calls.Values)
                 {
-                    var endCall = await _callService.EndCallAsync(UserId, call.Key, CallStatus.Accepted, DateTime.UtcNow);
-                    var callParticipants = endCall.Values.First().Participants;
-                    var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
-
-                    for (int i = 0; i < callParticipants.Count; i++)
+                    foreach (var call in callCategory)
                     {
-                        var profileToSend = callParticipants[i].Equals(UserId) ? recipientProfiles[callParticipants[1]] : recipientProfiles[UserId];
-
-                        await Clients.User(callParticipants[i]).SendAsync("ReceiveEndCall", new Dictionary<string, object>
+                        if (call.Value.Status.Equals(CallStatus.Ongoing))
                         {
-                            { "call", endCall },
-                            { profileToSend.Equals(recipientProfiles[callParticipants[1]]) ? callParticipants[1] : UserId, profileToSend }
+                            var endCall = await _callService.EndCallAsync(UserId, call.Key, CallStatus.Accepted, DateTime.UtcNow);
+                            var callParticipants = await _callService.GetCallParticipantsAsync(UserId, call.Key);
+                            var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
+
+                            foreach (var participant in callParticipants)
+                            {
+                                // Find the other participant (not current user)
+                                var otherParticipant = callParticipants.FirstOrDefault(p => p != UserId);
+                                if (!string.IsNullOrEmpty(otherParticipant))
+                                {
+                                    var profileToSend = participant.Equals(UserId) ?
+                                        (recipientProfiles.ContainsKey(otherParticipant) ? recipientProfiles[otherParticipant] : null) :
+                                        (recipientProfiles.ContainsKey(UserId) ? recipientProfiles[UserId] : null);
+
+                                    if (profileToSend != null)
+                                    {
+                                        await Clients.User(participant).SendAsync("ReceiveEndCall", new Dictionary<string, object>
+                                        {
+                                            { "call", endCall },
+                                            { participant.Equals(UserId) ? otherParticipant : UserId, profileToSend }
+                                        });
+                                    }
+                                }
+                            }
                         }
-                        );
                     }
                 }
             }
-            await base.OnDisconnectedAsync(exception);
+            catch (Exception ex)
+            {
+                // Log the exception but don't send to client since they're disconnecting
+                Console.WriteLine($"Error handling ongoing calls in CallHub disconnect: {ex.Message}");
+            }
+            finally
+            {
+                await base.OnDisconnectedAsync(exception);
+            }
         }
 
         /// <summary>
@@ -98,11 +131,18 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task Initial()
         {
-            var (calls, callRecipientIds) = await _callService.GetCallLogs(UserId);
-            var recipientProfiles = await _userService.GetUserProfilesAsync(callRecipientIds);
+            try
+            {
+                var (calls, callRecipientIds) = await _callService.GetCallLogsAsync(UserId);
+                var recipientProfiles = await _userService.GetUserProfilesAsync(callRecipientIds);
 
-            await Clients.Caller.SendAsync("ReceiveInitialCalls", calls);
-            await Clients.Caller.SendAsync("ReceiveInitialCallRecipientProfiles", recipientProfiles);
+                await Clients.Caller.SendAsync("ReceiveInitialCalls", calls);
+                await Clients.Caller.SendAsync("ReceiveInitialCallRecipientProfiles", recipientProfiles);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در بارگذاری تماس‌ها رخ داد!", errorDetails = ex.Message });
+            }
         }
 
         /// <summary>
@@ -124,20 +164,18 @@ namespace ChatNest.API.Hubs
                 var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
 
                 await Clients.User(UserId).SendAsync("ReceiveOutgoingCall", new Dictionary<string, object>
-                    {
-                        { "callId", callId },
-                        { "callType", callType },
-                        { recipientId, recipientProfiles[recipientId] }
-                    }
-                );
+                {
+                    { "callId", callId },
+                    { "callType", callType },
+                    { recipientId, recipientProfiles.ContainsKey(recipientId) ? recipientProfiles[recipientId] : null }
+                });
 
                 await Clients.User(recipientId).SendAsync("ReceiveIncomingCall", new Dictionary<string, object>
-                    {
-                        { "callId", callId },
-                        { "callType", callType },
-                        { UserId, recipientProfiles[UserId] }
-                    }
-                );
+                {
+                    { "callId", callId },
+                    { "callType", callType },
+                    { UserId, recipientProfiles.ContainsKey(UserId) ? recipientProfiles[UserId] : null }
+                });
             }
             catch (Exception ex) when (
                 ex is NotFoundException ||
@@ -148,7 +186,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در شروع تماس رخ داد!", errorDetails = ex.Message });
             }
         }
 
@@ -177,7 +215,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در پذیرش تماس رخ داد!", errorDetails = ex.Message });
             }
         }
 
@@ -197,19 +235,26 @@ namespace ChatNest.API.Hubs
             try
             {
                 var call = await _callService.EndCallAsync(UserId, callId, callStatus, createdDate);
-                var callParticipants = call.Values.First().Participants;
+                var callParticipants = await _callService.GetCallParticipantsAsync(UserId, callId);
                 var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
 
-                for (int i = 0; i < callParticipants.Count; i++)
+                foreach (var participant in callParticipants)
                 {
-                    var profileToSend = callParticipants[i].Equals(UserId) ? recipientProfiles[callParticipants[1]] : recipientProfiles[UserId];
+                    // Find the other participant (not current participant)
+                    var otherParticipant = callParticipants.FirstOrDefault(p => p != participant);
+                    if (!string.IsNullOrEmpty(otherParticipant))
+                    {
+                        var profileToSend = recipientProfiles.ContainsKey(otherParticipant) ? recipientProfiles[otherParticipant] : null;
 
-                    await Clients.User(callParticipants[i]).SendAsync("ReceiveEndCall", new Dictionary<string, object>
+                        if (profileToSend != null)
                         {
-                            { "call", call },
-                            { profileToSend.Equals(recipientProfiles[callParticipants[1]]) ? callParticipants[1] : UserId, profileToSend }
+                            await Clients.User(participant).SendAsync("ReceiveEndCall", new Dictionary<string, object>
+                            {
+                                { "call", call },
+                                { otherParticipant, profileToSend }
+                            });
                         }
-                    );
+                    }
                 }
             }
             catch (Exception ex) when (
@@ -221,7 +266,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در پایان تماس رخ داد!", errorDetails = ex.Message });
             }
         }
 
@@ -250,7 +295,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در حذف تماس رخ داد!", errorDetails = ex.Message });
             }
         }
 
@@ -269,17 +314,17 @@ namespace ChatNest.API.Hubs
             try
             {
                 var call = await _callService.GetCallAsync(UserId, callId);
+                var participants = await _callService.GetCallParticipantsAsync(UserId, callId);
 
-                foreach (var participant in call.Participants)
+                foreach (var participant in participants)
                 {
                     if (!participant.Equals(UserId))
                     {
                         await Clients.User(participant).SendAsync("ReceiveSdp", new Dictionary<string, object>
-                            {
-                                {"sdp", sdp },
-                                {"callType", call.Type }
-                            }
-                        );
+                        {
+                            {"sdp", sdp },
+                            {"callType", call.Type }
+                        });
                     }
                 }
             }
@@ -292,7 +337,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در ارسال SDP رخ داد!", errorDetails = ex.Message });
             }
         }
 
@@ -310,9 +355,9 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                var call = await _callService.GetCallAsync(UserId, callId);
+                var participants = await _callService.GetCallParticipantsAsync(UserId, callId);
 
-                foreach (var participant in call.Participants)
+                foreach (var participant in participants)
                 {
                     if (!participant.Equals(UserId))
                     {
@@ -329,7 +374,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در ارسال ICE Candidate رخ داد!", errorDetails = ex.Message });
             }
         }
     }

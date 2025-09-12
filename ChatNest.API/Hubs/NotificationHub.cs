@@ -20,7 +20,7 @@ namespace ChatNest.API.Hubs
         /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
         /// </summary>
         /// <returns>شناسه منحصربه‌فرد کاربر فعلی.</returns>
-        /// <exception cref="NullReferenceException">
+        /// <exception cref="UnauthorizedAccessException">
         /// در صورتی که شناسه کاربر یافت نشود یا با مقدار null مواجه شود پرتاب می‌شود.
         /// </exception>
         private string UserId
@@ -28,9 +28,12 @@ namespace ChatNest.API.Hubs
             get
             {
                 var identity = Context?.User?.Identity as ClaimsIdentity;
-                return identity?
-                    .FindFirst(ClaimTypes.NameIdentifier)?
-                    .Value!;
+                var userId = identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrEmpty(userId))
+                    throw new UnauthorizedAccessException("User ID not found in token");
+
+                return userId;
             }
         }
 
@@ -50,7 +53,14 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">در صورت بروز خطا هنگام برقراری اتصال پرتاب می‌شود.</exception>
         public override async Task OnConnectedAsync()
         {
-            await base.OnConnectedAsync();
+            try
+            {
+                await base.OnConnectedAsync();
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("ConnectionError", new { message = "خطای اتصال به هاب اعلان‌ها رخ داده است!", errorDetails = ex.Message });
+            }
         }
 
         /// <summary>
@@ -61,24 +71,10 @@ namespace ChatNest.API.Hubs
         /// <exception cref="Exception">در صورت بروز خطا هنگام قطع اتصال پرتاب می‌شود.</exception>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            DateTime lastConnectionDate = DateTime.UtcNow;
-            await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
-
-            await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>> { { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", lastConnectionDate } } } });
-            await base.OnDisconnectedAsync(exception);
-        }
-
-        /// <summary>
-        /// تاریخ آخرین اتصال کاربر را با مقدار صفر به‌روزرسانی می‌کند و به سایر کلاینت‌ها اطلاع می‌دهد.
-        /// </summary>
-        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
-        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
-        public async Task Initial()
-        {
             try
             {
-                DateTime lastConnectionDate = DateTime.MinValue;
-                await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate!);
+                DateTime lastConnectionDate = DateTime.UtcNow;
+                await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
 
                 await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
                 {
@@ -87,7 +83,40 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                // Log the exception but don't send to client since they're disconnecting
+                Console.WriteLine($"Error updating last connection date in NotificationHub: {ex.Message}");
+            }
+            finally
+            {
+                await base.OnDisconnectedAsync(exception);
+            }
+        }
+
+        /// <summary>
+        /// اطلاعات اولیه اعلان‌ها را بارگذاری کرده و به کلاینت ارسال می‌کند.
+        /// </summary>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
+        public async Task Initial()
+        {
+            try
+            {
+                // Set user as online (using current time instead of MinValue)
+                DateTime connectionDate = DateTime.UtcNow;
+                await _userService.UpdateLastConnectionDateAsync(UserId, connectionDate);
+
+                // Notify others that user is now online
+                await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
+                {
+                    { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", connectionDate } } }
+                });
+
+                // Send successful initialization response
+                await Clients.Caller.SendAsync("NotificationHubInitialized", new { status = "connected", timestamp = connectionDate });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در بارگذاری اعلان‌ها رخ داد!", errorDetails = ex.Message });
             }
         }
 
@@ -106,11 +135,10 @@ namespace ChatNest.API.Hubs
             {
                 var users = await _userService.SearchUsersAsync(UserId, query);
                 await Clients.Caller.SendAsync("ReceiveSearchUsers", new Dictionary<string, object>
-                    {
-                        {"query", query },
-                        {"data", users }
-                    }
-                );
+                {
+                    {"query", query },
+                    {"data", users }
+                });
             }
             catch (Exception ex) when (
                 ex is NotFoundException ||
@@ -121,7 +149,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در جستجوی کاربران رخ داد!", errorDetails = ex.Message });
             }
         }
     }

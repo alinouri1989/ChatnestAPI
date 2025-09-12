@@ -1,91 +1,124 @@
-﻿using ChatNest.DataAccess.Abstract;
-using ChatNest.DataAccess.Contexts;
+﻿using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace ChatNest.DataAccess.Concrete
+namespace ChatNest.DataAccess.Concrete;
+
+public class ChatRepository : IChatRepository
 {
-    public sealed class ChatRepository : IChatRepository
+    private readonly ChatNestDbContext _context;
+
+    public ChatRepository(ChatNestDbContext context)
     {
-        private readonly ChatNestDbContext _context;
+        _context = context;
+    }
 
-        public ChatRepository(ChatNestDbContext context)
+    public async Task<Chat> AddChatAsync(Chat chat)
+    {
+        _context.Chats.Add(chat);
+        await _context.SaveChangesAsync();
+        return chat;
+    }
+
+    public async Task<Chat?> GetChatByIdAsync(Guid id)
+    {
+        return await _context.Chats
+            .Include(c => c.Messages)
+            .Include(c => c.ChatParticipants)
+            .FirstOrDefaultAsync(c => c.Id == id);
+    }
+
+    public async Task<List<Chat>> GetChatsByUserIdAsync(string userId)
+    {
+        return await _context.Chats
+            .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
+            .Include(c => c.Messages)
+            .Include(c => c.ChatParticipants)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId)
+    {
+        return await _context.Chats
+            .Include(c => c.Messages)
+            .Include(c => c.ChatParticipants)
+            .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
+            .OrderByDescending(c => c.CreatedDate)
+            .ToListAsync();
+    }
+
+    public async Task<Chat> UpdateChatAsync(Chat chat)
+    {
+        _context.Chats.Update(chat);
+        await _context.SaveChangesAsync();
+        return chat;
+    }
+
+    public async Task DeleteChatAsync(Guid id)
+    {
+        var chat = await _context.Chats.FindAsync(id);
+        if (chat != null)
         {
-            _context = context;
-        }
-
-        public async Task<IEnumerable<Chat>> GetChatsAsync(string chatType)
-        {
-            return await _context.Chats
-                .Where(c => c.ChatType == chatType)
-                .Include(c => c.Messages)
-                .ToListAsync();
-        }
-
-        public async Task CreateChatAsync(Chat chat)
-        {
-            chat.Id = Guid.NewGuid();
-            chat.CreatedDate = DateTime.UtcNow;
-
-            _context.Chats.Add(chat);
+            _context.Chats.Remove(chat);
             await _context.SaveChangesAsync();
         }
+    }
 
-        public async Task<Chat?> GetChatByIdAsync(Guid chatId)
+    // Add new methods for participant management
+    public async Task AddParticipantAsync(Guid chatId, string userId)
+    {
+        var participant = new ChatParticipant
         {
-            return await _context.Chats
-                .Include(c => c.Messages)
-                .FirstOrDefaultAsync(c => c.Id == chatId);
-        }
+            ChatId = chatId,
+            UserId = userId,
+            JoinedAt = DateTime.UtcNow
+        };
 
-        public async Task<List<string>> GetChatParticipantsByIdAsync(Guid chatId)
-        {
-            var chat = await _context.Chats.FindAsync(chatId);
-            return chat?.Participants ?? new List<string>();
-        }
+        _context.Set<ChatParticipant>().Add(participant);
+        await _context.SaveChangesAsync();
+    }
 
-        public async Task UpdateChatArchivedForAsync(Guid chatId, Dictionary<string, DateTime> archivedFor)
-        {
-            var chat = await _context.Chats.FindAsync(chatId);
-            if (chat != null)
-            {
-                chat.ArchivedFor = archivedFor;
-                await _context.SaveChangesAsync();
-            }
-        }
+    public async Task RemoveParticipantAsync(Guid chatId, string userId)
+    {
+        var participant = await _context.Set<ChatParticipant>()
+            .FirstOrDefaultAsync(cp => cp.ChatId == chatId && cp.UserId == userId);
 
-        public async Task UpdateChatAsync(Chat chat)
+        if (participant != null)
         {
-            _context.Chats.Update(chat);
+            _context.Set<ChatParticipant>().Remove(participant);
             await _context.SaveChangesAsync();
         }
+    }
 
-        public async Task<bool> DeleteChatAsync(Guid chatId)
-        {
-            var chat = await _context.Chats.FindAsync(chatId);
-            if (chat != null)
-            {
-                _context.Chats.Remove(chat);
-                await _context.SaveChangesAsync();
-                return true;
-            }
-            return false;
-        }
+    public async Task<List<string>> GetChatParticipantsAsync(Guid chatId)
+    {
+        return await _context.Set<ChatParticipant>()
+            .Where(cp => cp.ChatId == chatId)
+            .Select(cp => cp.UserId)
+            .ToListAsync();
+    }
+    public async Task<Chat?> GetChatByParticipantsAsync(List<string> participantIds)
+    {
+        if (participantIds == null || !participantIds.Any())
+            return null;
 
-        public async Task<Chat?> GetChatByParticipantsAsync(List<string> participants)
-        {
-            return await _context.Chats
-                .FirstOrDefaultAsync(c => c.Participants.Count == participants.Count &&
-                                         participants.All(p => c.Participants.Contains(p)));
-        }
+        // Sort the participant IDs to ensure consistent comparison
+        var sortedParticipants = participantIds.OrderBy(x => x).ToList();
 
-        public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId)
+        // Get all chats that have participants matching our list
+        var potentialChats = await _context.Chats
+            .Include(c => c.ChatParticipants)
+            .Include(c => c.Messages)
+            .Where(c => c.ChatParticipants.Any(cp => participantIds.Contains(cp.UserId)))
+            .ToListAsync();
+
+        // Find chat with exactly matching participants
+        var matchingChat = potentialChats.FirstOrDefault(c =>
         {
-            return await _context.Chats
-                .Where(c => c.Participants.Contains(userId))
-                .Include(c => c.Messages)
-                .OrderByDescending(c => c.CreatedDate)
-                .ToListAsync();
-        }
+            var chatParticipantIds = c.ChatParticipants.Select(cp => cp.UserId).OrderBy(x => x).ToList();
+            return chatParticipantIds.SequenceEqual(sortedParticipants);
+        });
+
+        return matchingChat;
     }
 }

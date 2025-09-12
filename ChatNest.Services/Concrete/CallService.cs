@@ -1,8 +1,6 @@
 ﻿using AutoMapper;
-using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
-using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 
 namespace ChatNest.Services.Concrete
@@ -24,9 +22,10 @@ namespace ChatNest.Services.Concrete
         {
             var participants = new List<string> { userId, recipientId };
 
+            // Create the call first
             var call = new Call
             {
-                Participants = participants,
+                Id = Guid.NewGuid(),
                 Type = callType,
                 Status = CallStatus.Pending,
                 CreatedDate = DateTime.UtcNow
@@ -39,7 +38,14 @@ namespace ChatNest.Services.Concrete
                 call.ChatId = chat.Id;
             }
 
-            await _callRepository.CreateOrUpdateCallAsync(call);
+            // Create the call
+            await _callRepository.AddCallAsync(call);
+
+            // Add participants to the call
+            foreach (var participantId in participants)
+            {
+                await _callRepository.AddParticipantAsync(call.Id, participantId);
+            }
 
             return call.Id.ToString();
         }
@@ -47,8 +53,13 @@ namespace ChatNest.Services.Concrete
         public async Task AcceptCallAsync(string userId, string callId)
         {
             var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
-            if (call == null || !call.Participants.Contains(userId))
-                throw new NotFoundException("Call not found or access denied");
+            if (call == null)
+                throw new NotFoundException("Call not found");
+
+            // Check if user is participant
+            var participants = await GetCallParticipantsAsync(userId, callId);
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             if (call.Status != CallStatus.Pending)
                 throw new BadRequestException("Call is not in pending state");
@@ -60,8 +71,13 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, Call>> EndCallAsync(string userId, string callId, CallStatus callStatus, DateTime? createdDate)
         {
             var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
-            if (call == null || !call.Participants.Contains(userId))
-                throw new NotFoundException("Call not found or access denied");
+            if (call == null)
+                throw new NotFoundException("Call not found");
+
+            // Check if user is participant
+            var participants = await GetCallParticipantsAsync(userId, callId);
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             call.Status = callStatus;
 
@@ -83,26 +99,38 @@ namespace ChatNest.Services.Concrete
         public async Task DeleteCallAsync(string userId, string callId)
         {
             var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
-            if (call == null || !call.Participants.Contains(userId))
-                throw new NotFoundException("Call not found or access denied");
+            if (call == null)
+                throw new NotFoundException("Call not found");
+
+            // Check if user is participant
+            var participants = await GetCallParticipantsAsync(userId, callId);
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             var deletedFor = call.DeletedFor;
             deletedFor[userId] = DateTime.UtcNow;
-
             call.DeletedFor = deletedFor;
+
             await _callRepository.UpdateCallAsync(call);
         }
 
         public async Task<List<string>> GetCallParticipantsAsync(string userId, string callId)
         {
             var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
-            if (call == null || !call.Participants.Contains(userId))
-                throw new NotFoundException("Call not found or access denied");
+            if (call == null)
+                throw new NotFoundException("Call not found");
 
-            return await _callRepository.GetCallParticipantsByIdAsync(Guid.Parse(callId));
+            // Get participants from junction table
+            var participants = call.CallParticipants.Select(cp => cp.UserId).ToList();
+
+            // Check if requesting user is a participant
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
+
+            return participants;
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Call>>, List<string>)> GetCallLogs(string userId)
+        public async Task<(Dictionary<string, Dictionary<string, Call>>, List<string>)> GetCallLogsAsync(string userId)
         {
             var userCalls = await _callRepository.GetUserCallsAsync(userId);
 
@@ -115,18 +143,42 @@ namespace ChatNest.Services.Concrete
                 { "calls", callDict }
             };
 
-            var participants = visibleCalls.SelectMany(c => c.Participants).Distinct().Where(p => p != userId).ToList();
+            // Get all participants from the visible calls
+            var allParticipants = new List<string>();
+            foreach (var call in visibleCalls)
+            {
+                var participants = call.CallParticipants.Select(cp => cp.UserId).ToList();
+                allParticipants.AddRange(participants);
+            }
 
-            return (result, participants);
+            var uniqueParticipants = allParticipants.Distinct().Where(p => p != userId).ToList();
+
+            return (result, uniqueParticipants);
         }
 
         public async Task<Call> GetCallAsync(string userId, string callId)
         {
             var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
-            if (call == null || !call.Participants.Contains(userId))
-                throw new NotFoundException("Call not found or access denied");
+            if (call == null)
+                throw new NotFoundException("Call not found");
+
+            // Check if user is participant
+            var participants = call.CallParticipants.Select(cp => cp.UserId).ToList();
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
 
             return call;
+        }
+
+        // Add new helper methods
+        public async Task AddParticipantToCallAsync(string callId, string userId)
+        {
+            await _callRepository.AddParticipantAsync(Guid.Parse(callId), userId);
+        }
+
+        public async Task RemoveParticipantFromCallAsync(string callId, string userId)
+        {
+            await _callRepository.RemoveParticipantAsync(Guid.Parse(callId), userId);
         }
     }
 }

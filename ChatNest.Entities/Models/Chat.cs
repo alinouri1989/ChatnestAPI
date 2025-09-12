@@ -12,18 +12,6 @@ public sealed class Chat
     public string ChatType { get; set; } = "Individual"; // Individual or Group
 
     // Store as JSON string in database
-    public string ParticipantsJson { get; set; } = string.Empty;
-
-    [NotMapped]
-    public List<string> Participants
-    {
-        get => string.IsNullOrEmpty(ParticipantsJson) ?
-               new List<string>() :
-               JsonSerializer.Deserialize<List<string>>(ParticipantsJson) ?? new List<string>();
-        set => ParticipantsJson = JsonSerializer.Serialize(value);
-    }
-
-    // Store as JSON string in database
     public string ArchivedForJson { get; set; } = string.Empty;
 
     [NotMapped]
@@ -37,6 +25,9 @@ public sealed class Chat
 
     public DateTime CreatedDate { get; set; }
 
-    // Navigation property
+    // Navigation properties
     public ICollection<Message> Messages { get; set; } = new List<Message>();
+
+    // Add this navigation property
+    public ICollection<ChatParticipant> ChatParticipants { get; set; } = new List<ChatParticipant>();
 }

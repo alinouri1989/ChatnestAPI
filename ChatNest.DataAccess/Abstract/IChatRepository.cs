@@ -1,17 +1,17 @@
 ﻿using ChatNest.Entities.Models;
 
-namespace ChatNest.DataAccess.Abstract
+public interface IChatRepository
 {
-    public interface IChatRepository
-    {
-        Task<IEnumerable<Chat>> GetChatsAsync(string chatType);
-        Task CreateChatAsync(Chat chat);
-        Task<Chat?> GetChatByIdAsync(Guid chatId);
-        Task<List<string>> GetChatParticipantsByIdAsync(Guid chatId);
-        Task UpdateChatArchivedForAsync(Guid chatId, Dictionary<string, DateTime> archivedFor);
-        Task UpdateChatAsync(Chat chat);
-        Task<bool> DeleteChatAsync(Guid chatId);
-        Task<Chat?> GetChatByParticipantsAsync(List<string> participants);
-        Task<IEnumerable<Chat>> GetUserChatsAsync(string userId);
-    }
+    Task<Chat> AddChatAsync(Chat chat);
+    Task<Chat?> GetChatByIdAsync(Guid id);
+    Task<List<Chat>> GetChatsByUserIdAsync(string userId);
+    Task<IEnumerable<Chat>> GetUserChatsAsync(string userId);
+    Task<Chat> UpdateChatAsync(Chat chat);
+    Task DeleteChatAsync(Guid id);
+    Task AddParticipantAsync(Guid chatId, string userId);
+    Task RemoveParticipantAsync(Guid chatId, string userId);
+    Task<List<string>> GetChatParticipantsAsync(Guid chatId);
+
+    // Add this missing method
+    Task<Chat?> GetChatByParticipantsAsync(List<string> participantIds);
 }
