@@ -3,17 +3,17 @@
 namespace ChatNest.Shared.DTOs.Request
 {
     /// <summary>
-    /// Yeni bir grup oluşturmak için kullanılan veri transfer nesnesi (DTO).
-    /// Grup ismi, açıklaması, fotoğraf bilgisi ve katılımcıları içerir.
+    /// شیء انتقال داده (DTO) برای ایجاد گروه جدید.
+    /// شامل نام گروه، توضیحات، اطلاعات عکس و شرکت‌کنندگان می‌باشد.
     /// </summary>
     public sealed record CreateGroup
     {
-        [Required(ErrorMessage = "Lütfen bir grup adı giriniz.")]
-        [StringLength(50, MinimumLength = 2, ErrorMessage = "Grup ismi en az 2, en fazla 50 karakter uzunluğunda olmalıdır.")]
+        [Required(ErrorMessage = "لطفاً نام گروه را وارد کنید.")]
+        [StringLength(50, MinimumLength = 2, ErrorMessage = "نام گروه باید حداقل 2 و حداکثر 50 کاراکتر باشد.")]
         public string Name { get; init; }
 
 
-        [MaxLength(100, ErrorMessage = "Grup açıklaması en fazla 100 karakter uzunluğunda olmalıdır.")]
+        [MaxLength(100, ErrorMessage = "توضیحات گروه باید حداکثر 100 کاراکتر باشد.")]
         public string? Description { get; init; }
 
 
@@ -23,7 +23,7 @@ namespace ChatNest.Shared.DTOs.Request
         public string? PhotoUrl { get; init; }
 
 
-        [Required(ErrorMessage = "Grup oluşturabilmek için en az bir üye eklenmelidir.")]
+        [Required(ErrorMessage = "برای ایجاد گروه باید حداقل یک عضو اضافه شود.")]
         public string Participants { get; init; }
         public List<string>? SelectedParticipants { get; set; }
     }

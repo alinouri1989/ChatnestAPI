@@ -4,44 +4,40 @@ using ChatNest.Shared.DTOs.Request;
 namespace ChatNest.Services.Abstract
 {
     /// <summary>
-    /// Mesaj yönetim servislerini sağlayan arayüz.
+    /// رابط ارائه‌دهنده سرویس‌های مدیریت پیام.
     /// </summary>
     public interface IMessageService
     {
         /// <summary>
-        /// Bir mesaj gönderir.
+        /// یک پیام ارسال می‌کند.
         /// </summary>
-        /// <param name="userId">Mesajı gönderen kullanıcının kimliği.</param>
-        /// <param name="chatId">Mesajın gönderileceği sohbetin kimliği.</param>
-        /// <param name="chatType">Sohbet türü (örneğin bireysel, grup). </param>
-        /// <param name="dto">Gönderilecek mesajın içeriğini içeren DTO.</param>
-        /// <returns>Gönderilen mesajı ve ilgili bilgileri içeren bir sözlük döner.</returns>
+        /// <param name="userId">شناسه کاربری که پیام را ارسال می‌کند.</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام به آن ارسال می‌شود.</param>
+        /// <param name="chatType">نوع گفتگو (مثال: شخصی، گروهی).</param>
+        /// <param name="dto">DTO حاوی محتوای پیام ارسالی.</param>
+        /// <returns>دیکشنری حاوی پیام ارسال شده و اطلاعات مرتبط برمی‌گرداند.</returns>
         Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(string userId, string chatId, string chatType, SendMessage dto);
 
-
-
         /// <summary>
-        /// Bir mesajı siler.
+        /// یک پیام را حذف می‌کند.
         /// </summary>
-        /// <param name="userId">Mesajı silen kullanıcının kimliği.</param>
-        /// <param name="chatType">Sohbet türü (örneğin bireysel, grup).</param>
-        /// <param name="chatId">Mesajın silineceği sohbetin kimliği.</param>
-        /// <param name="messageId">Silinecek mesajın kimliği.</param>
-        /// <param name="deletionType">Mesajın silinme türü (örneğin, sadece kullanıcı tarafından mı, yoksa grup genelinde mi silinecek).</param>
-        /// <returns>Silinen mesajla ilgili güncellenmiş sohbet bilgilerini içeren bir sözlük döner.</returns>
+        /// <param name="userId">شناسه کاربری که پیام را حذف می‌کند.</param>
+        /// <param name="chatType">نوع گفتگو (مثال: شخصی، گروهی).</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام از آن حذف می‌شود.</param>
+        /// <param name="messageId">شناسه پیامی که باید حذف شود.</param>
+        /// <param name="deletionType">نوع حذف پیام (مثال: آیا فقط برای کاربر حذف شود یا برای کل گروه).</param>
+        /// <returns>دیکشنری حاوی اطلاعات به‌روزرسانی شده گفتگو مرتبط با پیام حذف شده برمی‌گرداند.</returns>
         Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(string userId, string chatType, string chatId, string messageId, byte deletionType);
 
-
-
         /// <summary>
-        /// Bir mesajın teslim edildiğini veya okunduğunu işaretler.
+        /// تحویل یا خوانده شدن یک پیام را علامت‌گذاری می‌کند.
         /// </summary>
-        /// <param name="userId">Mesajı okuyan ya da teslim alan kullanıcının kimliği.</param>
-        /// <param name="chatType">Sohbet türü (örneğin bireysel, grup).</param>
-        /// <param name="chatId">Mesajın bulunduğu sohbetin kimliği.</param>
-        /// <param name="messageId">İşaretlenecek mesajın kimliği.</param>
-        /// <param name="fieldName">Hangi alanın (Okundu, Teslim Edildi vb.) güncellenmesi gerektiği.</param>
-        /// <returns>Güncellenmiş sohbet bilgileri ile birlikte bir sözlük döner.</returns>
+        /// <param name="userId">شناسه کاربری که پیام را می‌خواند یا تحویل می‌گیرد.</param>
+        /// <param name="chatType">نوع گفتگو (مثال: شخصی، گروهی).</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام در آن قرار دارد.</param>
+        /// <param name="messageId">شناسه پیامی که باید علامت‌گذاری شود.</param>
+        /// <param name="fieldName">کدام فیلد (خوانده شده، تحویل داده شده و غیره) باید به‌روزرسانی شود.</param>
+        /// <returns>دیکشنری همراه با اطلاعات به‌روزرسانی شده گفتگو برمی‌گرداند.</returns>
         Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(string userId, string chatType, string chatId, string messageId, string fieldName);
     }
 }

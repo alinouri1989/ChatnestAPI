@@ -32,29 +32,32 @@ namespace ChatNest.Services.Concrete
             _mapper = mapper;
         }
 
-        public async Task SignUpAsync(SignUp dto)
+        public async Task<IdentityResult> SignUpAsync(SignUp dto)
         {
-            var User = new User
+            if (string.IsNullOrWhiteSpace(dto.Email))
+            {
+                throw new BadRequestException("Email is required");
+            }
+
+            var identityUser = new User
             {
                 UserName = dto.Email,
                 Email = dto.Email,
                 DisplayName = dto.DisplayName,
+                BirthDate = dto.BirthDate.ToShortDateString(),
                 CreatedDate = DateTime.UtcNow,
-                LastConnectionDate = DateTime.UtcNow,
-                ProviderId = "email"
             };
 
-            var result = await _authRepository.CreateUserAsync(User, dto.Password);
+            var result = await _userManager.CreateAsync(identityUser, dto.Password);
 
             if (result.Succeeded)
             {
-                var user = _mapper.Map<User>(dto);
-                user.Id = User.Id;
-                await _userRepository.CreateUserAsync(user);
+                return result;
             }
             else
             {
-                throw new BadRequestException(string.Join(", ", result.Errors.Select(e => e.Description)));
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new BadRequestException(errors);
             }
         }
 

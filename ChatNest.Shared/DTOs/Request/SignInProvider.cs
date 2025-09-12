@@ -1,7 +1,7 @@
 ﻿namespace ChatNest.Shared.DTOs.Request
 {
     /// <summary>
-    /// Harici kimlik sağlayıcıları (Google, Facebook vb.) ile giriş yapan kullanıcıların kimlik bilgilerini içeren veri transfer nesnesi (DTO).
+    /// شیء انتقال داده (DTO) که حاوی اطلاعات هویتی کاربرانی است که با ارائه‌دهندگان هویت خارجی (مانند گوگل، فیس‌بوک و غیره) وارد می‌شوند.
     /// </summary>
     public class SignInProvider
     {
@@ -19,7 +19,9 @@
         public required string AppName { get; init; }
     }
 
-
+    /// <summary>
+    /// اطلاعات ارائه‌دهنده هویت خارجی
+    /// </summary>
     public sealed record ProviderData
     {
         public required string ProviderId { get; init; }
@@ -31,6 +33,9 @@
         public string? PhotoUrl { get; set; }
     }
 
+    /// <summary>
+    /// مدیریت توکن‌های امنیتی و احراز هویت
+    /// </summary>
     public sealed record StsTokenManager
     {
         public required string RefreshToken { get; init; }

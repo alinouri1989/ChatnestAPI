@@ -4,16 +4,16 @@ using System.ComponentModel.DataAnnotations;
 namespace ChatNest.Shared.DTOs.Request
 {
     /// <summary>
-    /// Kullanıcıların mesaj göndermesi için kullanılan veri transfer nesnesi (DTO).
-    /// Mesaj içeriği ve içeriğin türünü içerir.
+    /// شیء انتقال داده (DTO) برای ارسال پیام توسط کاربران.
+    /// شامل محتوای پیام و نوع محتوا می‌باشد.
     /// </summary>
     public sealed record SendMessage
     {
-        [Required(ErrorMessage = "Lütfen bir içerik tipi seçiniz.")]
-        [EnumDataType(typeof(MessageContent), ErrorMessage = "Geçersiz bir içerik seçildi.")]
+        [Required(ErrorMessage = "لطفاً یک نوع محتوا انتخاب کنید.")]
+        [EnumDataType(typeof(MessageContent), ErrorMessage = "محتوای انتخاب شده نامعتبر است.")]
         public MessageContent ContentType { get; init; }
 
-        [Required(ErrorMessage = "Lütfen bir mesaj giriniz.")]
+        [Required(ErrorMessage = "لطفاً یک پیام وارد کنید.")]
         public string Content { get; init; }
         public byte[]? File { get; set; }
         public string? FileName { get; set; }

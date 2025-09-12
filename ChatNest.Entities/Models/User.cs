@@ -8,12 +8,12 @@ namespace ChatNest.Entities.Models;
 
 public class User : IdentityUser
 {
-    public string? MobileNo { get; set; }
+    public string? MobileNo { get; set; } = string.Empty;
     public bool MobileConfirmed { get; set; }
-    public string? NationalCode { get; set; }
+    public string? NationalCode { get; set; } = string.Empty;
     public DateTime? CreateDate { get; set; }
-    public string Firstname { get; set; }
-    public string Lastname { get; set; }
+    public string Firstname { get; set; } = string.Empty;
+    public string Lastname { get; set; } = string.Empty;
     public string Fullname
     {
         get
@@ -22,24 +22,24 @@ public class User : IdentityUser
         }
     }
 
-    [Required, EmailAddress]
-    public string Email { get; set; } = string.Empty;
+    // ❌ Remove this - IdentityUser already has Email property
+    // [Required, EmailAddress]
+    // public string Email { get; set; } = string.Empty;
 
     [Required, MaxLength(100)]
     public string DisplayName { get; set; } = string.Empty;
 
-    [Phone]
-    public string? PhoneNumber { get; set; }
+    // ❌ Remove this too - IdentityUser already has PhoneNumber
+    // [Phone]
+    // public string? PhoneNumber { get; set; } = string.Empty;
 
     [MaxLength(500)]
-    public string? Biography { get; set; }
+    public string? Biography { get; set; } = string.Empty;
 
     public Uri? ProfilePhoto { get; set; }
-
     public string ProviderId { get; set; } = string.Empty;
-
     public DateTime CreatedDate { get; set; }
-    public string BirthDate { get; set; }
+    public string BirthDate { get; set; } = string.Empty;
     public DateTime LastConnectionDate { get; set; }
 
     // Store as JSON string in database
@@ -57,5 +57,4 @@ public class User : IdentityUser
     // Navigation properties
     public ICollection<Group> CreatedGroups { get; set; } = new List<Group>();
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; }
-
 }

@@ -7,23 +7,21 @@ using System.Security.Claims;
 namespace ChatNest.API.Hubs
 {
     /// <summary>
-    /// Gerçek zamanlı bildirim işlemlerini yöneten SignalR hub sınıfıdır.
-    /// Kullanıcı bağlantılarını, profil güncellemelerini ve kullanıcı aramalarını yönetir.
+    /// کلاس هاب SignalR برای مدیریت عملیات اعلان در زمان واقعی.
+    /// اتصالات کاربر، به‌روزرسانی‌های پروفایل و جستجوی کاربران را مدیریت می‌کند.
     /// </summary>
     [Authorize]
     public sealed class NotificationHub : Hub
     {
         private readonly IUserService _userService;
 
-
-
         /// <summary>
-        /// Geçerli kullanıcının kimliğini (UserId) döndürür.
-        /// Kullanıcının kimliği, JWT içindeki <see cref="ClaimTypes.NameIdentifier"/> değerinden alınır.
+        /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
+        /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
         /// </summary>
-        /// <returns>Geçerli kullanıcının benzersiz kimliği.</returns>
+        /// <returns>شناسه منحصربه‌فرد کاربر فعلی.</returns>
         /// <exception cref="NullReferenceException">
-        /// Eğer kullanıcı kimliği bulunamazsa veya bir null değer ile karşılaşılırsa fırlatılır.
+        /// در صورتی که شناسه کاربر یافت نشود یا با مقدار null مواجه شود پرتاب می‌شود.
         /// </exception>
         private string UserId
         {
@@ -36,37 +34,31 @@ namespace ChatNest.API.Hubs
             }
         }
 
-
-
         /// <summary>
-        /// <see cref="NotificationHub"/> sınıfının yeni bir örneğini oluşturur.
+        /// یک نمونه جدید از کلاس <see cref="NotificationHub"/> را ایجاد می‌کند.
         /// </summary>
-        /// <param name="userService">Kullanıcı işlemleri için <see cref="IUserService"/> bağımlılığı.</param>
+        /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
         public NotificationHub(IUserService userService)
         {
             _userService = userService;
         }
 
-
-
         /// <summary>
-        /// Kullanıcı bağlantı kurduğunda çağrılır.
+        /// زمانی که کاربر اتصال برقرار می‌کند فراخوانی می‌شود.
         /// </summary>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="Exception">Bağlantı kurulurken bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطا هنگام برقراری اتصال پرتاب می‌شود.</exception>
         public override async Task OnConnectedAsync()
         {
             await base.OnConnectedAsync();
         }
 
-
-
         /// <summary>
-        /// Kullanıcı bağlantısını kestiğinde çağrılır. Kullanıcının son bağlantı tarihini günceller ve diğer kullanıcılara bildirir.
+        /// زمانی که کاربر اتصال را قطع می‌کند فراخوانی می‌شود. تاریخ آخرین اتصال کاربر را به‌روزرسانی کرده و به کاربران دیگر اطلاع می‌دهد.
         /// </summary>
-        /// <param name="exception">Bağlantı kesilme sırasında oluşan hata (varsa).</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="Exception">Bağlantı kesilme sırasında bir hata oluşursa fırlatılır.</exception>
+        /// <param name="exception">خطای رخ داده هنگام قطع اتصال (در صورت وجود).</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطا هنگام قطع اتصال پرتاب می‌شود.</exception>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             DateTime lastConnectionDate = DateTime.UtcNow;
@@ -76,13 +68,11 @@ namespace ChatNest.API.Hubs
             await base.OnDisconnectedAsync(exception);
         }
 
-
-
         /// <summary>
-        /// Kullanıcının son bağlantı tarihini sıfırlayarak günceller ve diğer istemcilere bildirir.
+        /// تاریخ آخرین اتصال کاربر را با مقدار صفر به‌روزرسانی می‌کند و به سایر کلاینت‌ها اطلاع می‌دهد.
         /// </summary>
-        /// <returns>Asenkron işlemi temsil eden bir <see cref="Task"/> nesnesi.</returns>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task Initial()
         {
             try
@@ -97,21 +87,19 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcılar arasında arama yapar ve sonuçları çağıran kullanıcıya gönderir.
+        /// در بین کاربران جستجو انجام می‌دهد و نتایج را به کاربر فراخوان‌کننده ارسال می‌کند.
         /// </summary>
-        /// <param name="query">Arama terimi.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Arama sonuçları bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz arama parametresi sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının arama yapmaya yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="query">عبارت جستجو.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن نتایج جستجو پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامتر جستجوی نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام جستجو نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task SearchUsers(string query)
         {
             try
@@ -133,7 +121,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
     }

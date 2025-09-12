@@ -4,133 +4,108 @@ using ChatNest.Shared.DTOs.Response;
 namespace ChatNest.Services.Abstract
 {
     /// <summary>
-    /// Kullanıcı yönetim servislerini sağlayan arayüz.
+    /// رابط ارائه‌دهنده سرویس‌های مدیریت کاربر.
     /// </summary>
     public interface IUserService
     {
         /// <summary>
-        /// Kullanıcıları sorgular ve eşleşenleri döner.
+        /// کاربران را جستجو می‌کند و موارد منطبق را برمی‌گرداند.
         /// </summary>
-        /// <param name="userId">Arama yapan kullanıcının kimliği.</param>
-        /// <param name="query">Arama sorgusu.</param>
-        /// <returns>Eşleşen kullanıcıları içeren bir sözlük döner.</returns>
+        /// <param name="userId">شناسه کاربری که جستجو انجام می‌دهد.</param>
+        /// <param name="query">عبارت جستجو.</param>
+        /// <returns>دیکشنری حاوی کاربران منطبق برمی‌گرداند.</returns>
         Task<Dictionary<string, FoundUsers>> SearchUsersAsync(string userId, string query);
 
-
-
-
         /// <summary>
-        /// Kullanıcı bilgilerini getirir.
+        /// اطلاعات کاربر را دریافت می‌کند.
         /// </summary>
-        /// <param name="userId">Bilgisi getirilecek kullanıcının kimliği.</param>
-        /// <returns>Kullanıcı bilgilerini içeren bir DTO döner.</returns>
+        /// <param name="userId">شناسه کاربری که اطلاعات آن دریافت می‌شود.</param>
+        /// <returns>DTO حاوی اطلاعات کاربر برمی‌گرداند.</returns>
         Task<UserInfo> GetUserInfoAsync(string userId);
 
-
-
         /// <summary>
-        /// Birden fazla kullanıcı profili getirir.
+        /// چندین پروفایل کاربر را دریافت می‌کند.
         /// </summary>
-        /// <param name="recipientIds">Kullanıcı profilleri için kimlikler listesi.</param>
-        /// <returns>Kullanıcı profillerini içeren bir sözlük döner.</returns>
+        /// <param name="recipientIds">فهرست شناسه‌ها برای پروفایل‌های کاربر.</param>
+        /// <returns>دیکشنری حاوی پروفایل‌های کاربر برمی‌گرداند.</returns>
         Task<Dictionary<string, CallerUser>> GetUserProfilesAsync(List<string> recipientIds);
 
-
-
         /// <summary>
-        /// Kullanıcı profil fotoğrafını kaldırır.
+        /// عکس پروفایل کاربر را حذف می‌کند.
         /// </summary>
-        /// <param name="userId">Profil fotoğrafı kaldırılacak kullanıcının kimliği.</param>
-        /// <returns>Kaldırılmış profil fotoğrafının URI'sini döner.</returns>
+        /// <param name="userId">شناسه کاربری که عکس پروفایل آن حذف می‌شود.</param>
+        /// <returns>URI عکس پروفایل حذف شده را برمی‌گرداند.</returns>
         Task<Uri> RemoveProfilePhotoAsync(string userId);
 
-
-
         /// <summary>
-        /// Kullanıcı profil fotoğrafını günceller.
+        /// عکس پروفایل کاربر را به‌روزرسانی می‌کند.
         /// </summary>
-        /// <param name="userId">Profil fotoğrafı güncellenecek kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni profil fotoğrafını içeren DTO.</param>
-        /// <returns>Güncellenmiş profil fotoğrafının URI'sini döner.</returns>
+        /// <param name="userId">شناسه کاربری که عکس پروفایل آن به‌روزرسانی می‌شود.</param>
+        /// <param name="dto">DTO حاوی عکس پروفایل جدید.</param>
+        /// <returns>URI عکس پروفایل به‌روزرسانی شده را برمی‌گرداند.</returns>
         Task<Uri> UpdateProfilePhotoAsync(string userId, UpdateProfilePhoto dto);
 
-
-
         /// <summary>
-        /// Kullanıcı adı (DisplayName) günceller.
+        /// نام نمایشی (DisplayName) کاربر را به‌روزرسانی می‌کند.
         /// </summary>
-        /// <param name="userId">Kullanıcı adını güncelleyecek kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni kullanıcı adı bilgilerini içeren DTO.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که نام نمایشی آن به‌روزرسانی می‌شود.</param>
+        /// <param name="dto">DTO حاوی اطلاعات نام نمایشی جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task UpdateDisplayNameAsync(string userId, UpdateDisplayName dto);
 
-
-
         /// <summary>
-        /// Kullanıcı telefon numarasını günceller.
+        /// شماره تلفن کاربر را به‌روزرسانی می‌کند.
         /// </summary>
-        /// <param name="userId">Telefon numarası güncellenecek kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni telefon numarasını içeren DTO.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که شماره تلفن آن به‌روزرسانی می‌شود.</param>
+        /// <param name="dto">DTO حاوی شماره تلفن جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task UpdatePhoneNumberAsync(string userId, UpdatePhoneNumber dto);
 
-
-
         /// <summary>
-        /// Kullanıcı biyografisini günceller.
+        /// بیوگرافی کاربر را به‌روزرسانی می‌کند.
         /// </summary>
-        /// <param name="userId">Biyografi güncellenecek kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni biyografi bilgisini içeren DTO.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که بیوگرافی آن به‌روزرسانی می‌شود.</param>
+        /// <param name="dto">DTO حاوی اطلاعات بیوگرافی جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task UpdateBiographyAsync(string userId, UpdateBiography dto);
 
-
-
         /// <summary>
-        /// Kullanıcı şifresini değiştirir.
+        /// رمز عبور کاربر را تغییر می‌دهد.
         /// </summary>
-        /// <param name="userId">Şifre değişikliği yapılacak kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni şifreyi içeren DTO.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که رمز عبور آن تغییر می‌کند.</param>
+        /// <param name="dto">DTO حاوی رمز عبور جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task ChangePasswordAsync(string userId, ChangePassword dto);
 
-
-
         /// <summary>
-        /// Kullanıcı temasını değiştirir.
+        /// پوسته کاربر را تغییر می‌دهد.
         /// </summary>
-        /// <param name="userId">Tema değişikliği yapılacak kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni tema bilgilerini içeren DTO.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که پوسته آن تغییر می‌کند.</param>
+        /// <param name="dto">DTO حاوی اطلاعات پوسته جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task ChangeThemeAsync(string userId, ChangeTheme dto);
 
-
-
         /// <summary>
-        /// Kullanıcı sohbet arka planını değiştirir.
+        /// پس‌زمینه گفتگوی کاربر را تغییر می‌دهد.
         /// </summary>
-        /// <param name="userId">Sohbet arka planı değişikliği yapılacak kullanıcının kimliği.</param>
-        /// <param name="dto">Yeni sohbet arka planını içeren DTO.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که پس‌زمینه گفتگو آن تغییر می‌کند.</param>
+        /// <param name="dto">DTO حاوی پس‌زمینه گفتگوی جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task ChangeChatBackgroundAsync(string userId, ChangeChatBackground dto);
 
-
-
         /// <summary>
-        /// Birden fazla alıcının profil bilgilerini getirir.
+        /// اطلاعات پروفایل چندین گیرنده را دریافت می‌کند.
         /// </summary>
-        /// <param name="recipientIds">Alıcıların kimlikleri.</param>
-        /// <returns>Alıcı profillerini içeren bir sözlük döner.</returns>
+        /// <param name="recipientIds">شناسه‌های گیرندگان.</param>
+        /// <returns>دیکشنری حاوی پروفایل‌های گیرنده برمی‌گرداند.</returns>
         Task<Dictionary<string, RecipientProfile>> GetRecipientProfilesAsync(List<string> recipientIds);
 
-
-
         /// <summary>
-        /// Kullanıcının son bağlantı tarihini günceller.
+        /// تاریخ آخرین اتصال کاربر را به‌روزرسانی می‌کند.
         /// </summary>
-        /// <param name="userId">Bağlantı tarihi güncellenecek kullanıcının kimliği.</param>
-        /// <param name="lastConnectionDate">Yeni bağlantı tarihi.</param>
-        /// <returns>Bir işlem sonucu döner (void).</returns>
+        /// <param name="userId">شناسه کاربری که تاریخ اتصال آن به‌روزرسانی می‌شود.</param>
+        /// <param name="lastConnectionDate">تاریخ اتصال جدید.</param>
+        /// <returns>نتیجه عملیات را برمی‌گرداند (void).</returns>
         Task UpdateLastConnectionDateAsync(string userId, DateTime lastConnectionDate);
     }
 }

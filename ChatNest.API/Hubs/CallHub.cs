@@ -8,8 +8,8 @@ using System.Security.Claims;
 namespace ChatNest.API.Hubs
 {
     /// <summary>
-    /// Gerçek zamanlı çağrı işlemlerini yöneten SignalR hub sınıfıdır.
-    /// Kullanıcı bağlantılarını, çağrı başlatma, bitirme ve WebRTC sinyalleme işlemlerini yönetir.
+    /// کلاس هاب SignalR برای مدیریت عملیات تماس در زمان واقعی.
+    /// اتصالات کاربر، شروع تماس، پایان تماس و عملیات سیگنالینگ WebRTC را مدیریت می‌کند.
     /// </summary>
     [Authorize]
     public sealed class CallHub : Hub
@@ -17,15 +17,13 @@ namespace ChatNest.API.Hubs
         private readonly IUserService _userService;
         private readonly ICallService _callService;
 
-
-
         /// <summary>
-        /// Geçerli kullanıcının kimliğini (UserId) döndürür.
-        /// Kullanıcının kimliği, JWT içindeki <see cref="ClaimTypes.NameIdentifier"/> değerinden alınır.
+        /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
+        /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
         /// </summary>
-        /// <returns>Geçerli kullanıcının benzersiz kimliği.</returns>
+        /// <returns>شناسه منحصربه‌فرد کاربر فعلی.</returns>
         /// <exception cref="NullReferenceException">
-        /// Eğer kullanıcı kimliği bulunamazsa veya bir null değer ile karşılaşılırsa fırlatılır.
+        /// در صورتی که شناسه کاربر یافت نشود یا با مقدار null مواجه شود پرتاب می‌شود.
         /// </exception>
         private string UserId
         {
@@ -38,39 +36,33 @@ namespace ChatNest.API.Hubs
             }
         }
 
-
-
         /// <summary>
-        /// <see cref="CallHub"/> sınıfının yeni bir örneğini oluşturur.
+        /// یک نمونه جدید از کلاس <see cref="CallHub"/> را ایجاد می‌کند.
         /// </summary>
-        /// <param name="userService">Kullanıcı işlemleri için <see cref="IUserService"/> bağımlılığı.</param>
-        /// <param name="callService">Çağrı işlemleri için <see cref="ICallService"/> bağımlılığı.</param>
+        /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
+        /// <param name="callService">وابستگی <see cref="ICallService"/> برای عملیات تماس.</param>
         public CallHub(IUserService userService, ICallService callService)
         {
             _userService = userService;
             _callService = callService;
         }
 
-
-
         /// <summary>
-        /// Kullanıcı bağlantısı kurulduğunda çağrılır.
+        /// زمانی که اتصال کاربر برقرار می‌شود فراخوانی می‌شود.
         /// </summary>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public override async Task OnConnectedAsync()
         {
             await base.OnConnectedAsync();
         }
 
-
-
         /// <summary>
-        /// Kullanıcı bağlantısı kesildiğinde çağrılır. Bağlantının neden kesildiği isteğe bağlı bir <see cref="Exception"/> ile sağlanabilir.
+        /// زمانی که اتصال کاربر قطع می‌شود فراخوانی می‌شود. دلیل قطع اتصال می‌تواند به صورت اختیاری با یک <see cref="Exception"/> ارائه شود.
         /// </summary>
-        /// <param name="exception">Bağlantının kesilmesine neden olan hata (varsa).</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="exception">خطایی که باعث قطع اتصال شده است (در صورت وجود).</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             var (calls, _) = await _callService.GetCallLogs(UserId);
@@ -99,13 +91,11 @@ namespace ChatNest.API.Hubs
             await base.OnDisconnectedAsync(exception);
         }
 
-
-
         /// <summary>
-        /// Kullanıcının çağrı geçmişini ve ilgili alıcı profillerini yükler ve istemciye iletir.
+        /// تاریخچه تماس کاربر و پروفایل‌های گیرنده مرتبط را بارگذاری کرده و به کلاینت ارسال می‌کند.
         /// </summary>
-        /// <returns>Asenkron işlemi temsil eden bir <see cref="Task"/> nesnesi.</returns>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task Initial()
         {
             var (calls, callRecipientIds) = await _callService.GetCallLogs(UserId);
@@ -115,18 +105,16 @@ namespace ChatNest.API.Hubs
             await Clients.Caller.SendAsync("ReceiveInitialCallRecipientProfiles", recipientProfiles);
         }
 
-
-
         /// <summary>
-        /// Kullanıcılar arasında yeni bir çağrı başlatır ve hem arayan hem de alıcı kullanıcıya çağrı bilgilerini iletir.
+        /// یک تماس جدید بین کاربران شروع می‌کند و اطلاعات تماس را به هر دو کاربر (تماس‌گیرنده و گیرنده) ارسال می‌کند.
         /// </summary>
-        /// <param name="recipientId">Çağrının alıcısı olan kullanıcının benzersiz kimliği.</param>
-        /// <param name="callType">Çağrı türünü belirtir (sesli veya görüntülü).</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Kullanıcı veya alıcı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcı çağrıyı başlatmak için yetkili değilse fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="recipientId">شناسه منحصربه‌فرد کاربری که گیرنده تماس است.</param>
+        /// <param name="callType">نوع تماس را مشخص می‌کند (صوتی یا تصویری).</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن کاربر یا گیرنده پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به شروع تماس نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task StartCall(string recipientId, CallType callType)
         {
             try
@@ -160,21 +148,19 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Belirtilen çağrıyı kabul eder ve istemciye çağrının kabul edildiğine dair bildirim gönderir.
+        /// تماس مشخص شده را قبول می‌کند و اعلان قبول تماس را به کلاینت ارسال می‌کند.
         /// </summary>
-        /// <param name="callId">Kabul edilecek çağrının kimliği.</param>
-        /// <returns>Çağrı kabul edildiğinde istemciye geri bildirim gönderir.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz bir istek yapıldığında fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Yetkisiz erişim durumunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmeyen bir hata oluştuğunda fırlatılır.</exception>
+        /// <param name="callId">شناسه تماسی که باید قبول شود.</param>
+        /// <returns>زمانی که تماس قبول شود بازخورد به کلاینت ارسال می‌کند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">زمانی که درخواست نامعتبری ارسال شود پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورت دسترسی غیرمجاز پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">زمانی که خطای غیرمنتظره‌ای رخ دهد پرتاب می‌شود.</exception>
         public async Task AcceptCall(string callId)
         {
             try
@@ -191,23 +177,21 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Belirtilen çağrıyı sonlandırır ve tüm katılımcılara çağrının sona erdiğini bildirir.
+        /// تماس مشخص شده را پایان می‌دهد و به تمام شرکت‌کنندگان اطلاع پایان تماس را ارسال می‌کند.
         /// </summary>
-        /// <param name="callId">Sonlandırılacak çağrının kimliği.</param>
-        /// <param name="callStatus">Çağrının sona erme durumu.</param>
-        /// <param name="createdDate">Çağrının oluşturulma tarihi (isteğe bağlı).</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının çağrıyı sonlandırma yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="callId">شناسه تماسی که باید پایان یابد.</param>
+        /// <param name="callStatus">وضعیت پایان تماس.</param>
+        /// <param name="createdDate">تاریخ ایجاد تماس (اختیاری).</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به پایان دادن تماس نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task EndCall(string callId, CallStatus callStatus, DateTime? createdDate)
         {
             try
@@ -237,21 +221,19 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının belirttiği çağrıyı siler ve istemciye bildirim gönderir.
+        /// تماس مشخص شده توسط کاربر را حذف می‌کند و اعلان را به کلاینت ارسال می‌کند.
         /// </summary>
-        /// <param name="callId">Silinecek çağrının kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının çağrıyı silme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="callId">شناسه تماسی که باید حذف شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به حذف تماس نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task DeleteCall(string callId)
         {
             try
@@ -268,22 +250,20 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// WebRTC bağlantısı için SDP (Session Description Protocol) bilgisini çağrının diğer katılımcısına iletir.
+        /// اطلاعات SDP (Session Description Protocol) را برای اتصال WebRTC به شرکت‌کننده دیگر تماس ارسال می‌کند.
         /// </summary>
-        /// <param name="callId">SDP bilgisinin gönderileceği çağrının kimliği.</param>
-        /// <param name="sdp">Gönderilecek SDP nesnesi.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="callId">شناسه تماسی که اطلاعات SDP برای آن ارسال می‌شود.</param>
+        /// <param name="sdp">شیء SDP که باید ارسال شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task SendSdp(string callId, object sdp)
         {
             try
@@ -312,22 +292,20 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// WebRTC bağlantısı için ICE (Interactive Connectivity Establishment) adaylarını çağrının diğer katılımcısına iletir.
+        /// نامزدهای ICE (Interactive Connectivity Establishment) را برای اتصال WebRTC به شرکت‌کننده دیگر تماس ارسال می‌کند.
         /// </summary>
-        /// <param name="callId">ICE adayının gönderileceği çağrının kimliği.</param>
-        /// <param name="iceCandidate">Gönderilecek ICE adayı nesnesi.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Çağrı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="callId">شناسه تماسی که نامزد ICE برای آن ارسال می‌شود.</param>
+        /// <param name="iceCandidate">شیء نامزد ICE که باید ارسال شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task SendIceCandidate(string callId, object iceCandidate)
         {
             try
@@ -351,7 +329,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
     }

@@ -9,8 +9,8 @@ using System.Security.Claims;
 namespace ChatNest.API.Hubs
 {
     /// <summary>
-    /// Gerçek zamanlı sohbet işlemlerini yöneten SignalR hub sınıfıdır.
-    /// Kullanıcı bağlantılarını, sohbet başlatma, mesaj gönderme, sohbetleri listeleme ve grup işlemleri gibi işlemleri yönetir.
+    /// کلاس هاب SignalR برای مدیریت عملیات گفتگو در زمان واقعی.
+    /// اتصالات کاربر، شروع گفتگو، ارسال پیام، فهرست‌بندی گفتگوها و عملیات گروه را مدیریت می‌کند.
     /// </summary>
     [Authorize]
     public sealed class ChatHub : Hub
@@ -21,12 +21,12 @@ namespace ChatNest.API.Hubs
         private readonly IUserService _userService;
 
         /// <summary>
-        /// Geçerli kullanıcının kimliğini (UserId) döndürür.
-        /// Kullanıcının kimliği, JWT içindeki <see cref="ClaimTypes.NameIdentifier"/> değerinden alınır.
+        /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
+        /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
         /// </summary>
-        /// <returns>Geçerli kullanıcının benzersiz kimliği.</returns>
+        /// <returns>شناسه منحصربه‌فرد کاربر فعلی.</returns>
         /// <exception cref="UnauthorizedAccessException">
-        /// Eğer kullanıcı kimliği bulunamazsa veya bir null değer ile karşılaşılırsa fırlatılır.
+        /// در صورتی که شناسه کاربر یافت نشود یا با مقدار null مواجه شود پرتاب می‌شود.
         /// </exception>
         private string UserId
         {
@@ -43,12 +43,12 @@ namespace ChatNest.API.Hubs
         }
 
         /// <summary>
-        /// <see cref="ChatHub"/> sınıfının yeni bir örneğini oluşturur.
+        /// یک نمونه جدید از کلاس <see cref="ChatHub"/> را ایجاد می‌کند.
         /// </summary>
-        /// <param name="messageService">Mesaj işlemleri için <see cref="IMessageService"/> bağımlılığı.</param>
-        /// <param name="groupService">Grup işlemleri için <see cref="IGroupService"/> bağımlılığı.</param>
-        /// <param name="chatService">Sohbet işlemleri için <see cref="IChatService"/> bağımlılığı.</param>
-        /// <param name="userService">Kullanıcı işlemleri için <see cref="IUserService"/> bağımlılığı.</param>
+        /// <param name="messageService">وابستگی <see cref="IMessageService"/> برای عملیات پیام.</param>
+        /// <param name="groupService">وابستگی <see cref="IGroupService"/> برای عملیات گروه.</param>
+        /// <param name="chatService">وابستگی <see cref="IChatService"/> برای عملیات گفتگو.</param>
+        /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
         public ChatHub(IMessageService messageService, IGroupService groupService, IChatService chatService, IUserService userService)
         {
             _messageService = messageService;
@@ -58,10 +58,10 @@ namespace ChatNest.API.Hubs
         }
 
         /// <summary>
-        /// Kullanıcı hub'a bağlandığında tetiklenen metod.
+        /// متدی که زمان اتصال کاربر به هاب فراخوانی می‌شود.
         /// </summary>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public override async Task OnConnectedAsync()
         {
             try
@@ -71,15 +71,15 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("ConnectionError", new { message = "Bağlantı hatası oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("ConnectionError", new { message = "خطای اتصال رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Kullanıcı hub'dan ayrıldığında tetiklenen metod.
+        /// متدی که زمان قطع اتصال کاربر از هاب فراخوانی می‌شود.
         /// </summary>
-        /// <param name="exception">Bağlantı sırasında oluşan hata (varsa).</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        /// <param name="exception">خطای رخ داده در طول اتصال (در صورت وجود).</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             try
@@ -98,10 +98,10 @@ namespace ChatNest.API.Hubs
         }
 
         /// <summary>
-        /// Kullanıcının tüm sohbetlerini, alıcı profillerini ve grup profillerini yükler ve istemciye iletir.
+        /// تمام گفتگوهای کاربر، پروفایل‌های گیرنده و پروفایل‌های گروه را بارگذاری کرده و به کلاینت ارسال می‌کند.
         /// </summary>
-        /// <returns>Asenkron işlemi temsil eden bir <see cref="Task"/> nesnesi.</returns>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task Initial()
         {
             try
@@ -120,20 +120,20 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Yeni bir sohbet başlatır ve katılımcılara sohbet bilgilerini iletir.
+        /// یک گفتگوی جدید شروع می‌کند و اطلاعات گفتگو را به شرکت‌کنندگان ارسال می‌کند.
         /// </summary>
-        /// <param name="chatType">Sohbet tipi ("Individual" veya "Group").</param>
-        /// <param name="recipientId">Sohbete katılacak alıcının kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>
+        /// <param name="recipientId">شناسه گیرنده‌ای که در گفتگو شرکت خواهد کرد.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task CreateChat(string chatType, string recipientId)
         {
             try
@@ -192,20 +192,20 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Belirli bir sohbetin içeriğini temizler.
+        /// محتوای یک گفتگوی مشخص را پاک می‌کند.
         /// </summary>
-        /// <param name="chatType">Sohbet tipi ("Individual" veya "Group").</param>
-        /// <param name="chatId">Temizlenecek sohbetin kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>
+        /// <param name="chatId">شناسه گفتگویی که باید پاک شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task ClearChat(string chatType, string chatId)
         {
             try
@@ -222,19 +222,19 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Belirli bir sohbeti arşivler.
+        /// یک گفتگوی مشخص را آرشیو می‌کند.
         /// </summary>
-        /// <param name="chatId">Arşivlenecek sohbetin kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatId">شناسه گفتگویی که باید آرشیو شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task ArchiveChat(string chatId)
         {
             try
@@ -251,19 +251,19 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Belirli bir sohbeti arşivden çıkarır.
+        /// یک گفتگوی مشخص را از آرشیو خارج می‌کند.
         /// </summary>
-        /// <param name="chatId">Arşivden çıkarılacak sohbetin kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatId">شناسه گفتگویی که باید از آرشیو خارج شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task UnarchiveChat(string chatId)
         {
             try
@@ -280,21 +280,21 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Kullanıcıdan gelen mesajı belirtilen sohbetin katılımcılarına gönderir.
+        /// پیام دریافتی از کاربر را به شرکت‌کنندگان گفتگوی مشخص شده ارسال می‌کند.
         /// </summary>
-        /// <param name="chatType">Sohbet tipi ("Individual" veya "Group").</param>
-        /// <param name="chatId">Mesajın gönderileceği sohbetin kimliği.</param>
-        /// <param name="dto">Gönderilen mesajı temsil eden DTO.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet veya mesaj verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام به آن ارسال می‌شود.</param>
+        /// <param name="dto">DTO نمایندگی کننده پیام ارسالی.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو یا پیام پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task SendMessage(string chatType, string chatId, SendMessage dto)
         {
             try
@@ -316,21 +316,21 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Bir mesajın teslim edildiğini işaretler ve sohbet katılımcılarına bildirir.
+        /// تحویل یک پیام را علامت‌گذاری می‌کند و به شرکت‌کنندگان گفتگو اطلاع می‌دهد.
         /// </summary>
-        /// <param name="chatType">Sohbet tipi ("Individual" veya "Group").</param>
-        /// <param name="chatId">Mesajın teslim edileceği sohbetin kimliği.</param>
-        /// <param name="messageId">Teslim edilecek mesajın kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet veya mesaj verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام در آن تحویل داده می‌شود.</param>
+        /// <param name="messageId">شناسه پیامی که باید تحویل داده شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو یا پیام پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task DeliverMessage(string chatType, string chatId, string messageId)
         {
             try
@@ -352,21 +352,21 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Bir mesajın okunduğunu işaretler ve sohbet katılımcılarına bildirir.
+        /// خوانده شدن یک پیام را علامت‌گذاری می‌کند و به شرکت‌کنندگان گفتگو اطلاع می‌دهد.
         /// </summary>
-        /// <param name="chatType">Sohbet tipi ("Individual" veya "Group").</param>
-        /// <param name="chatId">Mesajın okunacağı sohbetin kimliği.</param>
-        /// <param name="messageId">Okunacak mesajın kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet veya mesaj verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام در آن خوانده می‌شود.</param>
+        /// <param name="messageId">شناسه پیامی که باید خوانده شود.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو یا پیام پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task ReadMessage(string chatType, string chatId, string messageId)
         {
             try
@@ -388,22 +388,22 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Belirtilen mesajı siler ve sohbet katılımcılarına bildirir.
+        /// پیام مشخص شده را حذف می‌کند و به شرکت‌کنندگان گفتگو اطلاع می‌دهد.
         /// </summary>
-        /// <param name="chatType">Sohbet tipi ("Individual" veya "Group").</param>
-        /// <param name="chatId">Silinecek mesajın bulunduğu sohbetin kimliği.</param>
-        /// <param name="messageId">Silinecek mesajın kimliği.</param>
-        /// <param name="deletionType">Silme türünü belirtir ("0" veya "1").</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
-        /// <exception cref="NotFoundException">Sohbet veya mesaj verisi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="BadRequestException">Geçersiz parametreler sağlanırsa fırlatılır.</exception>
-        /// <exception cref="ForbiddenException">Kullanıcının bu işlemi gerçekleştirme yetkisi yoksa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>
+        /// <param name="chatId">شناسه گفتگویی که پیام مورد حذف در آن قرار دارد.</param>
+        /// <param name="messageId">شناسه پیامی که باید حذف شود.</param>
+        /// <param name="deletionType">نوع حذف را مشخص می‌کند ("0" یا "1").</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن داده‌های گفتگو یا پیام پرتاب می‌شود.</exception>
+        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         public async Task DeleteMessage(string chatType, string chatId, string messageId, byte deletionType)
         {
             try
@@ -425,15 +425,15 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Kullanıcının belirli bir gruba katılmasını sağlar.
+        /// کاربر را در گروه مشخص شده عضو می‌کند.
         /// </summary>
-        /// <param name="groupId">Katılınacak grup kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        /// <param name="groupId">شناسه گروهی که باید در آن عضو شد.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
         public async Task JoinGroup(string groupId)
         {
             try
@@ -443,15 +443,15 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Gruba katılırken hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام عضویت در گروه خطا رخ داد!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Kullanıcının belirli bir gruptan ayrılmasını sağlar.
+        /// کاربر را از گروه مشخص شده خارج می‌کند.
         /// </summary>
-        /// <param name="groupId">Ayrılınacak grup kimliği.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        /// <param name="groupId">شناسه گروهی که باید از آن خارج شد.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
         public async Task LeaveGroup(string groupId)
         {
             try
@@ -461,15 +461,15 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Gruptan ayrılırken hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام خروج از گروه خطا رخ داد!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Kullanıcının çevrimiçi durumunu günceller.
+        /// وضعیت آنلاین کاربر را به‌روزرسانی می‌کند.
         /// </summary>
-        /// <param name="isOnline">Kullanıcının çevrimiçi olup olmadığı.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        /// <param name="isOnline">اینکه آیا کاربر آنلاین است یا خیر.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
         public async Task UpdateOnlineStatus(bool isOnline)
         {
             try
@@ -482,16 +482,16 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Durum güncellenirken hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام به‌روزرسانی وضعیت خطا رخ داد!", errorDetails = ex.Message });
             }
         }
 
         /// <summary>
-        /// Kullanıcının yazdığını bildirir.
+        /// وضعیت تایپ کاربر را اطلاع می‌دهد.
         /// </summary>
-        /// <param name="chatId">Sohbet kimliği.</param>
-        /// <param name="isTyping">Yazyıp yazmadığı durumu.</param>
-        /// <returns>Bir <see cref="Task"/> nesnesi döner.</returns>
+        /// <param name="chatId">شناسه گفتگو.</param>
+        /// <param name="isTyping">وضعیت اینکه آیا در حال تایپ است یا خیر.</param>
+        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
         public async Task UpdateTypingStatus(string chatId, bool isTyping)
         {
             try
@@ -520,7 +520,7 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "Yazma durumu güncellenirken hata oluştu!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام به‌روزرسانی وضعیت تایپ خطا رخ داد!", errorDetails = ex.Message });
             }
         }
     }

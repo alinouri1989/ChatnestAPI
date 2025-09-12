@@ -138,7 +138,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://localhost:3000") // Add your frontend URLs
+        policy.WithOrigins("https://localhost:5173", "http://localhost:3000", "https://localhost:3000") // Add your frontend URLs
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials(); // Important for SignalR
@@ -148,6 +148,7 @@ builder.Services.AddCors(options =>
 // Add Swagger for development
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+await builder.Services.SeedIdentityDataAsync();
 
 var app = builder.Build();
 

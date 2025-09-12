@@ -1,15 +1,15 @@
-﻿using Firebase.Auth;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using ChatNest.Services.Abstract;
+﻿using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 using ChatNest.Shared.DTOs.Request;
+using Firebase.Auth;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ChatNest.API.Controllers
 {
     /// <summary>
-    /// Kullanıcı kimlik doğrulama işlemlerini yöneten API controller sınıfıdır.
-    /// Kullanıcı kaydı, oturum açma, sosyal medya ile giriş işlemlerini yönetir.
+    /// کلاس کنترلر API که عملیات احراز هویت کاربر را مدیریت می‌کند.
+    /// ثبت نام کاربر، ورود به سیستم، و ورود از طریق شبکه‌های اجتماعی را مدیریت می‌کند.
     /// </summary>
     [Route("api/[controller]/[action]")]
     [ApiController]
@@ -17,28 +17,24 @@ namespace ChatNest.API.Controllers
     {
         private readonly IAuthService _authService;
 
-
-
         /// <summary>
-        /// <see cref="AuthController"/> sınıfının yeni bir örneğini oluşturur.
+        /// یک نمونه جدید از کلاس <see cref="AuthController"/> را ایجاد می‌کند.
         /// </summary>
-        /// <param name="authService">Kullanıcı kimlik doğrulama işlemleri için <see cref="IAuthService"/> bağımlılığı.</param>
+        /// <param name="authService">وابستگی <see cref="IAuthService"/> برای عملیات احراز هویت کاربر.</param>
         public AuthController(IAuthService authService)
         {
             _authService = authService;
         }
 
-
-
         /// <summary>
-        /// Kullanıcı kaydını gerçekleştirir.
-        /// Geçersiz girişler ve hata durumlarında uygun cevaplar döner.
+        /// ثبت نام کاربر را انجام می‌دهد.
+        /// در صورت وجود ورودی‌های نامعتبر و شرایط خطا، پاسخ‌های مناسب برمی‌گرداند.
         /// </summary>
-        /// <param name="dto">Kayıt için gerekli olan kullanıcı bilgilerini içeren <see cref="SignUp"/> veri transfer objesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döner.</returns>
-        /// <exception cref="BadRequestException">Geçersiz kayıt işlemi durumunda fırlatılır.</exception>
-        /// <exception cref="FirebaseAuthHttpException">Firebase ile ilgili bir hata oluştuğunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="dto">شیء انتقال داده <see cref="SignUp"/> که اطلاعات کاربر مورد نیاز برای ثبت نام را شامل می‌شود.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">در صورت عملیات ثبت نام نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
         public async Task<IActionResult> SignUp([FromBody] SignUp dto)
         {
@@ -49,7 +45,7 @@ namespace ChatNest.API.Controllers
             try
             {
                 await _authService.SignUpAsync(dto);
-                return Ok(new { message = "Kullanıcı başarıyla kaydedildi." });
+                return Ok(new { message = "کاربر با موفقیت ثبت شد." });
             }
             catch (BadRequestException ex)
             {
@@ -59,28 +55,26 @@ namespace ChatNest.API.Controllers
             {
                 return ex.Reason switch
                 {
-                    AuthErrorReason.EmailExists => Conflict(new { message = "Bu e-posta adresi zaten kullanılıyor.", errorDetails = ex.Message }),
-                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "Bu işlem şu anda geçerli değil.", errorDetails = ex.Message }),
-                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "Çok fazla kayıt denemesi yapıldı. Lütfen daha sonra tekrar deneyin.", errorDetails = ex.Message }),
-                    _ => StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message })
+                    AuthErrorReason.EmailExists => Conflict(new { message = "این آدرس ایمیل قبلاً استفاده شده است.", errorDetails = ex.Message }),
+                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "این عملیات در حال حاضر مجاز نیست.", errorDetails = ex.Message }),
+                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "تلاش‌های زیادی برای ثبت نام انجام شده. لطفاً بعداً دوباره تلاش کنید.", errorDetails = ex.Message }),
+                    _ => StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message })
                 };
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// E-posta ve şifre ile giriş işlemi gerçekleştirir.
-        /// Geçersiz kimlik bilgileri ve hata durumlarında uygun cevaplar döner.
+        /// ورود به سیستم با ایمیل و رمز عبور را انجام می‌دهد.
+        /// در صورت اطلاعات هویتی نامعتبر و شرایط خطا، پاسخ‌های مناسب برمی‌گرداند.
         /// </summary>
-        /// <param name="dto">Giriş için gerekli olan e-posta ve şifre bilgilerini içeren <see cref="SignInEmail"/> veri transfer objesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döner.</returns>
-        /// <exception cref="FirebaseAuthHttpException">Firebase ile ilgili bir hata oluştuğunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="dto">شیء انتقال داده <see cref="SignInEmail"/> که اطلاعات ایمیل و رمز عبور مورد نیاز برای ورود را شامل می‌شود.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند.</returns>
+        /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
         public async Task<IActionResult> SignInEmail([FromBody] SignInEmail dto)
         {
@@ -96,33 +90,31 @@ namespace ChatNest.API.Controllers
             {
                 if (ex.Message.Contains("INVALID_LOGIN_CREDENTIALS"))
                 {
-                    return Unauthorized(new { message = "E-posta ya da şifre hatalı.", errorDetails = ex.Message });
+                    return Unauthorized(new { message = "ایمیل یا رمز عبور اشتباه است.", errorDetails = ex.Message });
                 }
                 return ex.Reason switch
                 {
-                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "Çok fazla giriş denemesi yapıldı. Lütfen daha sonra tekrar deneyiniz.", errorDetails = ex.Message }),
-                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "Bu işlem şu anda geçerli değil.", errorDetails = ex.Message }),
-                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "Hesabınız devre dışı bırakılmıştır.", errorDetails = ex.Message }),
-                    _ => StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message })
+                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "تلاش‌های زیادی برای ورود انجام شده. لطفاً بعداً دوباره تلاش کنید.", errorDetails = ex.Message }),
+                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "این عملیات در حال حاضر مجاز نیست.", errorDetails = ex.Message }),
+                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "حساب کاربری شما غیرفعال شده است.", errorDetails = ex.Message }),
+                    _ => StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message })
                 };
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Google ile giriş işlemi gerçekleştirir.
-        /// Google girişinin geçersiz olması ve diğer hata durumlarında uygun cevaplar döner.
+        /// ورود به سیستم با Google را انجام می‌دهد.
+        /// در صورت نامعتبر بودن ورود Google و سایر شرایط خطا، پاسخ‌های مناسب برمی‌گرداند.
         /// </summary>
-        /// <param name="dto">Google ile giriş için gerekli olan bilgileri içeren <see cref="SignInGoogle"/> veri transfer objesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döner.</returns>
-        /// <exception cref="BadRequestException">Geçersiz giriş işlemi durumunda fırlatılır.</exception>
-        /// <exception cref="FirebaseAuthHttpException">Firebase ile ilgili bir hata oluştuğunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="dto">شیء انتقال داده <see cref="SignInGoogle"/> که اطلاعات مورد نیاز برای ورود با Google را شامل می‌شود.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">در صورت عملیات ورود نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
         public async Task<IActionResult> SignInGoogle([FromBody] SignInProvider dto)
         {
@@ -142,29 +134,27 @@ namespace ChatNest.API.Controllers
             {
                 return ex.Reason switch
                 {
-                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "Çok fazla giriş denemesi yapıldı. Lütfen daha sonra tekrar deneyiniz.", errorDetails = ex.Message }),
-                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "Bu işlem şu anda geçerli değil.", errorDetails = ex.Message }),
-                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "Hesabınız devre dışı bırakılmıştır.", errorDetails = ex.Message }),
-                    _ => StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message })
+                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "تلاش‌های زیادی برای ورود انجام شده. لطفاً بعداً دوباره تلاش کنید.", errorDetails = ex.Message }),
+                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "این عملیات در حال حاضر مجاز نیست.", errorDetails = ex.Message }),
+                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "حساب کاربری شما غیرفعال شده است.", errorDetails = ex.Message }),
+                    _ => StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message })
                 };
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Facebook ile giriş işlemi gerçekleştirir.
-        /// Facebook girişinin geçersiz olması ve diğer hata durumlarında uygun cevaplar döner.
+        /// ورود به سیستم با Facebook را انجام می‌دهد.
+        /// در صورت نامعتبر بودن ورود Facebook و سایر شرایط خطا، پاسخ‌های مناسب برمی‌گرداند.
         /// </summary>
-        /// <param name="dto">Facebook ile giriş için gerekli olan bilgileri içeren <see cref="SignInProvider"/> veri transfer objesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döner.</returns>
-        /// <exception cref="BadRequestException">Geçersiz giriş işlemi durumunda fırlatılır.</exception>
-        /// <exception cref="FirebaseAuthHttpException">Firebase ile ilgili bir hata oluştuğunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="dto">شیء انتقال داده <see cref="SignInProvider"/> که اطلاعات مورد نیاز برای ورود با Facebook را شامل می‌شود.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">در صورت عملیات ورود نامعتبر پرتاب می‌شود.</exception>
+        /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
         public async Task<IActionResult> SignInFacebook([FromBody] SignInProvider dto)
         {
@@ -176,63 +166,59 @@ namespace ChatNest.API.Controllers
             {
                 return ex.Reason switch
                 {
-                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "Çok fazla giriş denemesi yapıldı. Lütfen daha sonra tekrar deneyiniz.", errorDetails = ex.Message }),
-                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "Bu işlem şu anda geçerli değil.", errorDetails = ex.Message }),
-                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "Hesabınız devre dışı bırakılmıştır.", errorDetails = ex.Message }),
-                    _ => StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message })
+                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "تلاش‌های زیادی برای ورود انجام شده. لطفاً بعداً دوباره تلاش کنید.", errorDetails = ex.Message }),
+                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "این عملیات در حال حاضر مجاز نیست.", errorDetails = ex.Message }),
+                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "حساب کاربری شما غیرفعال شده است.", errorDetails = ex.Message }),
+                    _ => StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message })
                 };
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcıyı oturumdan çıkarır.
-        /// Firebase ile ilgili hata oluşması durumunda uygun cevap döner.
+        /// کاربر را از سیستم خارج می‌کند.
+        /// در صورت بروز خطای مرتبط با Firebase، پاسخ مناسب برمی‌گرداند.
         /// </summary>
-        /// <returns>Bir <see cref="IActionResult"/> döner.</returns>
-        /// <exception cref="FirebaseAuthHttpException">Firebase ile ilgili bir hata oluştuğunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند.</returns>
+        /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> SignOut()
         {
             try
             {
-                return Ok(new { message = "Oturum kapatıldı." });
+                return Ok(new { message = "از سیستم خارج شدید." });
             }
             catch (FirebaseAuthHttpException ex)
             {
-                return StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Şifre sıfırlama bağlantısı gönderir.
-        /// Geçersiz e-posta veya hata durumunda uygun cevaplar döner.
+        /// لینک بازیابی رمز عبور ارسال می‌کند.
+        /// در صورت ایمیل نامعتبر یا شرایط خطا، پاسخ‌های مناسب برمی‌گرداند.
         /// </summary>
-        /// <param name="email">Şifresi sıfırlanacak kullanıcının e-posta adresi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döner.</returns>
-        /// <exception cref="NotFoundException">E-posta adresi bulunamazsa fırlatılır.</exception>
-        /// <exception cref="FirebaseAuthHttpException">Firebase ile ilgili bir hata oluştuğunda fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata oluşursa fırlatılır.</exception>
+        /// <param name="email">آدرس ایمیل کاربری که رمز عبورش باید بازیابی شود.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن آدرس ایمیل پرتاب می‌شود.</exception>
+        /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
         public async Task<IActionResult> Password([FromBody] string email)
         {
             try
             {
                 await _authService.ResetPasswordAsync(email);
-                return Ok(new { message = "Şifre sıfırlama bağlantısı gönderildi." });
+                return Ok(new { message = "لینک بازیابی رمز عبور ارسال شد." });
             }
             catch (NotFoundException ex)
             {
@@ -240,11 +226,11 @@ namespace ChatNest.API.Controllers
             }
             catch (FirebaseAuthHttpException ex)
             {
-                return StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
     }

@@ -1,53 +1,46 @@
 ﻿using ChatNest.Shared.DTOs.Request;
+using Microsoft.AspNetCore.Identity;
 
 namespace ChatNest.Services.Abstract
 {
     /// <summary>
-    /// Kullanıcı kimlik doğrulama işlemleri için gerekli servis arayüzü.
+    /// رابط سرویس مورد نیاز برای عملیات احراز هویت کاربر.
     /// </summary>
     public interface IAuthService
     {
         /// <summary>
-        /// Yeni bir kullanıcı kaydı oluşturur.
+        /// یک کاربر جدید ثبت می‌کند.
         /// </summary>
-        /// <param name="dto">Kullanıcı kaydı için gerekli bilgileri içeren DTO</param>
-        /// <returns>Asenkron bir işlem döner.</returns>
-        Task SignUpAsync(SignUp dto);
-
-
+        /// <param name="dto">DTO حاوی اطلاعات مورد نیاز برای ثبت کاربر</param>
+        /// <returns>یک عملیات ناهمزمان برمی‌گرداند.</returns>
+        Task<IdentityResult> SignUpAsync(SignUp dto);
 
         /// <summary>
-        /// E-posta ile kullanıcı girişini gerçekleştirir.
+        /// ورود کاربر با ایمیل را انجام می‌دهد.
         /// </summary>
-        /// <param name="dto">E-posta ve şifre bilgilerini içeren DTO</param>
-        /// <returns>Kimlik doğrulama token'ını döner.</returns>
+        /// <param name="dto">DTO حاوی اطلاعات ایمیل و رمز عبور</param>
+        /// <returns>توکن احراز هویت را برمی‌گرداند.</returns>
         Task<string> SignInEmailAsync(SignInEmail dto);
 
-
-
         /// <summary>
-        /// Google üzerinden kullanıcı girişini gerçekleştirir.
+        /// ورود کاربر از طریق Google را انجام می‌دهد.
         /// </summary>
-        /// <param name="dto">Google giriş bilgilerini içeren DTO</param>
-        /// <returns>Kimlik doğrulama token'ını döner.</returns>
+        /// <param name="dto">DTO حاوی اطلاعات ورود Google</param>
+        /// <returns>توکن احراز هویت را برمی‌گرداند.</returns>
         Task<string> SignInGoogleAsync(SignInProvider dto);
 
-
-
         /// <summary>
-        /// Facebook üzerinden kullanıcı girişini gerçekleştirir.
+        /// ورود کاربر از طریق Facebook را انجام می‌دهد.
         /// </summary>
-        /// <param name="dto">Facebook giriş bilgilerini içeren DTO</param>
-        /// <returns>Kimlik doğrulama token'ını döner.</returns>
+        /// <param name="dto">DTO حاوی اطلاعات ورود Facebook</param>
+        /// <returns>توکن احراز هویت را برمی‌گرداند.</returns>
         Task<string> SignInFacebookAsync(SignInProvider dto);
 
-
-
         /// <summary>
-        /// Şifre sıfırlama talebi oluşturur.
+        /// درخواست بازنشانی رمز عبور ایجاد می‌کند.
         /// </summary>
-        /// <param name="email">Şifre sıfırlama talebi için kullanılan e-posta adresi</param>
-        /// <returns>Asenkron bir işlem döner.</returns>
+        /// <param name="email">آدرس ایمیل استفاده شده برای درخواست بازنشانی رمز عبور</param>
+        /// <returns>یک عملیات ناهمزمان برمی‌گرداند.</returns>
         Task ResetPasswordAsync(string email);
     }
 }

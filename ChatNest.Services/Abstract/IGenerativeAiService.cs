@@ -3,26 +3,24 @@
 namespace ChatNest.Services.Abstract
 {
     /// <summary>
-    /// Generative AI servislerini sağlayan arayüz.
+    /// رابط ارائه‌دهنده سرویس‌های هوش مصنوعی تولیدی.
     /// </summary>
     public interface IGenerativeAiService
     {
         /// <summary>
-        /// Gemini modeli kullanarak metin oluşturur.
+        /// با استفاده از مدل Gemini متن تولید می‌کند.
         /// </summary>
-        /// <param name="request">AI modeline gönderilecek isteği içeren veri.</param>
-        /// <returns>Oluşturulan metni döner.</returns>
-        /// <exception cref="BadRequestException">Geçersiz AI modeli durumunda hata fırlatılır.</exception>
+        /// <param name="request">داده حاوی درخواست ارسالی به مدل هوش مصنوعی.</param>
+        /// <returns>متن تولید شده را برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">در صورت استفاده از مدل هوش مصنوعی نامعتبر خطا پرتاب می‌شود.</exception>
         Task<string> GeminiGenerateTextAsync(AiRequest request);
 
-
-
         /// <summary>
-        /// Hugging Face AI modelleri kullanarak resim oluşturur.
+        /// با استفاده از مدل‌های هوش مصنوعی Hugging Face تصویر تولید می‌کند.
         /// </summary>
-        /// <param name="request">AI modeline gönderilecek isteği içeren veri.</param>
-        /// <returns>Oluşturulan resmi base64 formatında döner.</returns>
-        /// <exception cref="BadRequestException">Geçersiz AI modeli durumunda hata fırlatılır.</exception>
+        /// <param name="request">داده حاوی درخواست ارسالی به مدل هوش مصنوعی.</param>
+        /// <returns>تصویر تولید شده را در فرمت base64 برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">در صورت استفاده از مدل هوش مصنوعی نامعتبر خطا پرتاب می‌شود.</exception>
         Task<string> HfGenerateImageAsync(AiRequest request);
     }
 }

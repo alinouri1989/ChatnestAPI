@@ -5,20 +5,20 @@ using System.Security.Claims;
 namespace ChatNest.API.Controllers
 {
     /// <summary>
-    /// API isteklerinde ortak işlevsellikleri yöneten temel denetleyici sınıfıdır.
-    /// Tüm denetleyiciler bu sınıftan türemekte olup, kullanıcı kimliğine erişim sağlayabilir.
+    /// کلاس کنترلر پایه که قابلیت‌های مشترک در درخواست‌های API را مدیریت می‌کند.
+    /// تمام کنترلرها از این کلاس ارث‌بری می‌کنند و می‌توانند به شناسه کاربر دسترسی داشته باشند.
     /// </summary>
     [Authorize]
     [ApiController]
     public abstract class BaseController : ControllerBase
     {
         /// <summary>
-        /// Geçerli kullanıcının kimliğini (UserId) döndürür.
-        /// Kullanıcının kimliği, JWT içindeki <see cref="ClaimTypes.NameIdentifier"/> değerinden alınır.
+        /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
+        /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
         /// </summary>
-        /// <returns>Geçerli kullanıcının benzersiz kimliği.</returns>
+        /// <returns>شناسه منحصربه‌فرد کاربر فعلی.</returns>
         /// <exception cref="NullReferenceException">
-        /// Eğer kullanıcı kimliği bulunamazsa veya bir null değer ile karşılaşılırsa fırlatılır.
+        /// در صورتی که شناسه کاربر یافت نشود یا با مقدار null مواجه شود پرتاب می‌شود.
         /// </exception>
         protected string UserId
         {

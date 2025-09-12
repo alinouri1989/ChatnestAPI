@@ -1,17 +1,17 @@
-﻿using Firebase.Auth;
-using Firebase.Database;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
-using ChatNest.API.Hubs;
+﻿using ChatNest.API.Hubs;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 using ChatNest.Shared.DTOs.Request;
+using Firebase.Auth;
+using Firebase.Database;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace ChatNest.API.Controllers
 {
     /// <summary>
-    /// Kullanıcı ile ilgili işlemleri gerçekleştiren API denetleyicisi.
-    /// Kullanıcı bilgileri, profil fotoğrafı, adı, telefon numarası gibi veriler üzerinde güncellemeler yapılabilir.
+    /// کنترلر API برای انجام عملیات مرتبط با کاربر.
+    /// اطلاعات کاربر، عکس پروفایل، نام، شماره تلفن و سایر داده‌ها قابل به‌روزرسانی هستند.
     /// </summary>
     [Route("api/[controller]/[action]")]
     [ApiController]
@@ -20,30 +20,26 @@ namespace ChatNest.API.Controllers
         private readonly IHubContext<NotificationHub> _notificationHubContext;
         private readonly IUserService _userService;
 
-
-
         /// <summary>
-        /// UserController sınıfının yapıcı metodudur.
-        /// Gerekli servisleri alarak controller'ı başlatır.
+        /// سازنده کلاس UserController.
+        /// سرویس‌های مورد نیاز را دریافت کرده و کنترلر را راه‌اندازی می‌کند.
         /// </summary>
-        /// <param name="notificationHubContext">Bildirim hub'ı için <see cref="IHubContext{NotificationHub}"/> nesnesi.</param>
-        /// <param name="userService">Kullanıcı işlemleri için <see cref="IUserService"/> nesnesi.</param>
+        /// <param name="notificationHubContext">شیء <see cref="IHubContext{NotificationHub}"/> برای هاب اعلان‌ها.</param>
+        /// <param name="userService">شیء <see cref="IUserService"/> برای عملیات کاربر.</param>
         public UserController(IHubContext<NotificationHub> notificationHubContext, IUserService userService)
         {
             _notificationHubContext = notificationHubContext;
             _userService = userService;
         }
 
-
-
         /// <summary>
-        /// Kullanıcı bilgilerini getirir.
-        /// Kullanıcının bilgileri, kullanıcı kimliği üzerinden alınır ve geri döndürülür.
+        /// اطلاعات کاربر را واکشی می‌کند.
+        /// اطلاعات کاربر بر اساس شناسه کاربری دریافت شده و برگردانده می‌شود.
         /// </summary>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda kullanıcı bilgilerini içerir.</returns>
-        /// <exception cref="NotFoundException"> Eğer kullanıcı bulunamazsa fırlatılır.</exception>
-        /// <exception cref="FirebaseException"> Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی اطلاعات کاربر است.</returns>
+        /// <exception cref="NotFoundException">در صورت یافت نشدن کاربر پرتاب می‌شود.</exception>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpGet]
         public async Task<IActionResult> Info()
         {
@@ -57,23 +53,21 @@ namespace ChatNest.API.Controllers
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının profil fotoğrafını kaldırır.
-        /// Profil fotoğrafı kaldırıldığında, ilgili değişiklikler tüm istemcilere bildirilir.
+        /// عکس پروفایل کاربر را حذف می‌کند.
+        /// پس از حذف عکس پروفایل، تغییرات مربوطه به تمام کلاینت‌ها اطلاع داده می‌شود.
         /// </summary>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda profil fotoğrafının kaldırıldığını bildirir.</returns>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حذف عکس پروفایل را اطلاع می‌دهد.</returns>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpDelete]
         public async Task<IActionResult> ProfilePhoto()
         {
@@ -82,29 +76,27 @@ namespace ChatNest.API.Controllers
                 var profilePhoto = await _userService.RemoveProfilePhotoAsync(UserId);
                 await _notificationHubContext.Clients.All.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>> { { UserId, new Dictionary<string, object> { { "profilePhoto", profilePhoto } } } });
 
-                return Ok(new { message = "Profil fotoğrafı kaldırıldı.", profilePhoto });
+                return Ok(new { message = "عکس پروفایل حذف شد.", profilePhoto });
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının profil fotoğrafını günceller.
-        /// Yeni profil fotoğrafı başarıyla güncellenir ve değişiklikler tüm istemcilere bildirilir.
+        /// عکس پروفایل کاربر را به‌روزرسانی می‌کند.
+        /// عکس پروفایل جدید با موفقیت به‌روزرسانی شده و تغییرات به تمام کلاینت‌ها اطلاع داده می‌شود.
         /// </summary>
-        /// <param name="dto">Profil fotoğrafı güncelleme bilgilerini içeren <see cref="UpdateProfilePhoto"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda yeni profil fotoğrafını içerir.</returns>
-        /// <exception cref="BadRequestException">Eğer gönderilen veri geçerli değilse fırlatılır.</exception>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="UpdateProfilePhoto"/> حاوی اطلاعات به‌روزرسانی عکس پروفایل.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی عکس پروفایل جدید است.</returns>
+        /// <exception cref="BadRequestException">در صورت نامعتبر بودن داده‌های ارسالی پرتاب می‌شود.</exception>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> ProfilePhoto([FromBody] UpdateProfilePhoto dto)
         {
@@ -117,7 +109,7 @@ namespace ChatNest.API.Controllers
                 var profilePhoto = await _userService.UpdateProfilePhotoAsync(UserId, dto);
                 await _notificationHubContext.Clients.All.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>> { { UserId, new Dictionary<string, object> { { "profilePhoto", profilePhoto } } } });
 
-                return Ok(new { message = "Profil fotoğrafı güncellendi.", profilePhoto });
+                return Ok(new { message = "عکس پروفایل به‌روزرسانی شد.", profilePhoto });
             }
             catch (BadRequestException ex)
             {
@@ -125,24 +117,22 @@ namespace ChatNest.API.Controllers
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının adı (displayName) güncellenir.
-        /// Yeni kullanıcı adı başarılı şekilde güncellenir ve değişiklik tüm istemcilere bildirilir.
+        /// نام نمایشی کاربر (displayName) به‌روزرسانی می‌شود.
+        /// نام کاربری جدید با موفقیت به‌روزرسانی شده و تغییرات به تمام کلاینت‌ها اطلاع داده می‌شود.
         /// </summary>
-        /// <param name="dto">Kullanıcı adı güncelleme bilgilerini içeren <see cref="UpdateDisplayName"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda yeni kullanıcı adı bilgisi içerir.</returns>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="UpdateDisplayName"/> حاوی اطلاعات به‌روزرسانی نام کاربری.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی اطلاعات نام کاربری جدید است.</returns>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> DisplayName([FromBody] UpdateDisplayName dto)
         {
@@ -155,28 +145,26 @@ namespace ChatNest.API.Controllers
                 await _userService.UpdateDisplayNameAsync(UserId, dto);
                 await _notificationHubContext.Clients.All.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>> { { UserId, new Dictionary<string, object> { { "displayName", dto.DisplayName } } } });
 
-                return Ok(new { message = "Kullanıcı adı güncellendi." });
+                return Ok(new { message = "نام کاربری به‌روزرسانی شد." });
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının telefon numarasını günceller.
-        /// Yeni telefon numarası başarılı şekilde güncellenir ve değişiklik tüm istemcilere bildirilir.
+        /// شماره تلفن کاربر را به‌روزرسانی می‌کند.
+        /// شماره تلفن جدید با موفقیت به‌روزرسانی شده و تغییرات به تمام کلاینت‌ها اطلاع داده می‌شود.
         /// </summary>
-        /// <param name="dto">Telefon numarası güncelleme bilgilerini içeren <see cref="UpdatePhoneNumber"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda yeni telefon numarası bilgisi içerir.</returns>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="UpdatePhoneNumber"/> حاوی اطلاعات به‌روزرسانی شماره تلفن.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی اطلاعات شماره تلفن جدید است.</returns>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> PhoneNumber([FromBody] UpdatePhoneNumber dto)
         {
@@ -189,28 +177,26 @@ namespace ChatNest.API.Controllers
                 await _userService.UpdatePhoneNumberAsync(UserId, dto);
                 await _notificationHubContext.Clients.All.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>> { { UserId, new Dictionary<string, object> { { "phoneNumber", dto.PhoneNumber } } } });
 
-                return Ok(new { message = "Telefon numrası güncellendi." });
+                return Ok(new { message = "شماره تلفن به‌روزرسانی شد." });
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu.", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu.", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının biyografisini günceller.
-        /// Yeni biyografi başarıyla güncellenir ve değişiklik tüm istemcilere bildirilir.
+        /// بیوگرافی کاربر را به‌روزرسانی می‌کند.
+        /// بیوگرافی جدید با موفقیت به‌روزرسانی شده و تغییرات به تمام کلاینت‌ها اطلاع داده می‌شود.
         /// </summary>
-        /// <param name="dto">Biyografi güncelleme bilgilerini içeren <see cref="UpdateBiography"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda yeni biyografi bilgisi içerir.</returns>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="UpdateBiography"/> حاوی اطلاعات به‌روزرسانی بیوگرافی.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی اطلاعات بیوگرافی جدید است.</returns>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> Biography([FromBody] UpdateBiography dto)
         {
@@ -223,29 +209,27 @@ namespace ChatNest.API.Controllers
                 await _userService.UpdateBiographyAsync(UserId, dto);
                 await _notificationHubContext.Clients.All.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>> { { UserId, new Dictionary<string, object> { { "biography", dto.Biography } } } });
 
-                return Ok(new { message = "Biyografi güncellendi." });
+                return Ok(new { message = "بیوگرافی به‌روزرسانی شد." });
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının şifresini değiştirir.
-        /// Yeni şifre başarıyla güncellenir.
+        /// رمز عبور کاربر را تغییر می‌دهد.
+        /// رمز عبور جدید با موفقیت به‌روزرسانی می‌شود.
         /// </summary>
-        /// <param name="dto">Şifre değiştirme bilgilerini içeren <see cref="ChangePassword"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda işlem mesajını içerir.</returns>
-        /// <exception cref="FirebaseAuthHttpException">Hatalı giriş bilgisi, çok fazla deneme veya kullanıcı engellenmişse ilgili hata mesajları döndürülür.</exception>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="ChangePassword"/> حاوی اطلاعات تغییر رمز عبور.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی پیام عملیات است.</returns>
+        /// <exception cref="FirebaseAuthHttpException">در صورت اطلاعات نامعتبر، تلاش‌های زیاد یا مسدود بودن کاربر، پیام‌های خطای مرتبط برگردانده می‌شود.</exception>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> Password([FromBody] ChangePassword dto)
         {
@@ -256,42 +240,40 @@ namespace ChatNest.API.Controllers
             try
             {
                 await _userService.ChangePasswordAsync(UserId, dto);
-                return Ok(new { message = "Şifre değiştirildi." });
+                return Ok(new { message = "رمز عبور تغییر یافت." });
             }
             catch (FirebaseAuthHttpException ex)
             {
                 if (ex.Message.Contains("INVALID_LOGIN_CREDENTIALS"))
                 {
-                    return Unauthorized(new { message = "Mevcut şifreniz hatalı.", errorDetails = ex.Message });
+                    return Unauthorized(new { message = "رمز عبور فعلی شما اشتباه است.", errorDetails = ex.Message });
                 }
                 return ex.Reason switch
                 {
-                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "Çok fazla giriş denemesi yapıldı. Lütfen daha sonra tekrar deneyiniz.", errorDetails = ex.Message }),
-                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "Bu işlem şu anda geçerli değil.", errorDetails = ex.Message }),
-                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "Hesabınız devre dışı bırakılmıştır.", errorDetails = ex.Message }),
-                    _ => StatusCode(500, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message })
+                    AuthErrorReason.TooManyAttemptsTryLater => StatusCode(StatusCodes.Status403Forbidden, new { message = "تلاش‌های زیادی برای ورود انجام شده. لطفاً بعداً دوباره تلاش کنید.", errorDetails = ex.Message }),
+                    AuthErrorReason.OperationNotAllowed => StatusCode(StatusCodes.Status403Forbidden, new { message = "این عملیات در حال حاضر مجاز نیست.", errorDetails = ex.Message }),
+                    AuthErrorReason.UserDisabled => StatusCode(StatusCodes.Status403Forbidden, new { message = "حساب کاربری شما غیرفعال شده است.", errorDetails = ex.Message }),
+                    _ => StatusCode(500, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message })
                 };
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının tema tercihini günceller.
-        /// Yeni tema başarıyla güncellenir.
+        /// تنظیمات تم کاربر را به‌روزرسانی می‌کند.
+        /// تم جدید با موفقیت به‌روزرسانی می‌شود.
         /// </summary>
-        /// <param name="dto">Tema değiştirme bilgilerini içeren <see cref="ChangeTheme"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda işlem mesajını içerir.</returns>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="ChangeTheme"/> حاوی اطلاعات تغییر تم.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی پیام عملیات است.</returns>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> Theme([FromBody] ChangeTheme dto)
         {
@@ -302,28 +284,26 @@ namespace ChatNest.API.Controllers
             try
             {
                 await _userService.ChangeThemeAsync(UserId, dto);
-                return Ok(new { message = "Tema güncellendi." });
+                return Ok(new { message = "تم به‌روزرسانی شد." });
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
 
-
-
         /// <summary>
-        /// Kullanıcının sohbet arka planını günceller.
-        /// Yeni sohbet arka planı başarıyla güncellenir.
+        /// پس‌زمینه گفتگوی کاربر را به‌روزرسانی می‌کند.
+        /// پس‌زمینه گفتگوی جدید با موفقیت به‌روزرسانی می‌شود.
         /// </summary>
-        /// <param name="dto">Sohbet arka planı değiştirme bilgilerini içeren <see cref="ChangeChatBackground"/> nesnesi.</param>
-        /// <returns>Bir <see cref="IActionResult"/> döndürür, başarılı olduğunda işlem mesajını içerir.</returns>
-        /// <exception cref="FirebaseException">Firebase ile ilgili bir hata oluşursa fırlatılır.</exception>
-        /// <exception cref="Exception">Beklenmedik bir hata durumunda fırlatılır.</exception>
+        /// <param name="dto">شیء <see cref="ChangeChatBackground"/> حاوی اطلاعات تغییر پس‌زمینه گفتگو.</param>
+        /// <returns>یک <see cref="IActionResult"/> برمی‌گرداند که در صورت موفقیت حاوی پیام عملیات است.</returns>
+        /// <exception cref="FirebaseException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPatch]
         public async Task<IActionResult> ChatBackground([FromBody] ChangeChatBackground dto)
         {
@@ -334,15 +314,15 @@ namespace ChatNest.API.Controllers
             try
             {
                 await _userService.ChangeChatBackgroundAsync(UserId, dto);
-                return Ok(new { message = "Sohbet arka planı güncellendi." });
+                return Ok(new { message = "پس‌زمینه گفتگو به‌روزرسانی شد." });
             }
             catch (FirebaseException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Firebase ile ilgili bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"Beklenmedik bir hata oluştu!", errorDetails = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
     }
