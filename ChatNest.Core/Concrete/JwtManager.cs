@@ -30,10 +30,10 @@ namespace ChatNest.Core.Concrete
         /// <param name="configuration">JWT ayarlarını içeren <see cref="IConfiguration"/> nesnesi.</param>
         public JwtManager(IConfiguration configuration)
         {
-            _secret = configuration["JWT:secret"];
-            _issuer = configuration["JWT:issuer"];
-            _audience = configuration["JWT:audience"];
-            _expiryInDays = byte.Parse(configuration["JWT:expiryInDays"]!);
+            _secret = configuration["JWT:SecretKey"];
+            _issuer = configuration["JWT:Issuer"];
+            _audience = configuration["JWT:Audience"];
+            _expiryInDays = byte.Parse(configuration["JWT:ExpiryInDays"]!);
         }
 
 

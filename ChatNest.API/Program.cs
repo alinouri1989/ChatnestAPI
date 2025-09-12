@@ -56,7 +56,7 @@ builder.Services.AddSingleton<HuggingFaceConfig>(provider =>
 
 // Add JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JWT");
-var secretKey = jwtSettings["SecretKey"] ?? "your-super-secret-key-that-is-at-least-32-characters-long";
+var secretKey = jwtSettings["SecretKey"] ?? "a154b25da06306c08587fc94866f9854";
 
 builder.Services.AddAuthentication(options =>
 {
@@ -88,7 +88,24 @@ builder.Services.AddAuthentication(options =>
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
 
-            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+            // Check for token in multiple locations
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                // Try Authorization header
+                accessToken = context.Request.Headers["Authorization"]
+                    .FirstOrDefault()?.Split(" ").Last();
+            }
+
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                // Try cookie
+                accessToken = context.Request.Cookies["jwt"];
+            }
+
+            if (!string.IsNullOrEmpty(accessToken) &&
+                (path.StartsWithSegments("/hub/Chat") ||
+                 path.StartsWithSegments("/hub/Notification") ||
+                 path.StartsWithSegments("/hub/Call")))
             {
                 context.Token = accessToken;
             }
@@ -168,9 +185,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<ChatHub>("/chatHub");
 
-// Apply migrations
+app.MapHub<ChatHub>("hub/Chat");
+app.MapHub<CallHub>("hub/Call");
+app.MapHub<NotificationHub>("hub/Notification");
+
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ChatNestDbContext>();
