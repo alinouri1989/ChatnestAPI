@@ -364,7 +364,7 @@ This phase is crucial because it ensures the application keeps evolving to meet 
   The project is compatible with popular web browsers like Chrome, Firefox, Safari, and Edge in their latest versions.  
 
 - **Project Link**:  
-  Access the project by clicking [here](https://mingleweb.netlify.app/).  
+  Access the project by clicking [here](https://chatnestui.netlify.app/).  
 
 - **Developers**:  
   The **backend** of the project was developed by **ali nouri**. For more information about the developer, please visit the [LinkedIn profile](https://www.linkedin.com/in/alinouri1989/).  
