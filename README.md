@@ -367,9 +367,6 @@ This phase is crucial because it ensures the application keeps evolving to meet 
   Access the project by clicking [here](https://mingleweb.netlify.app/).  
 
 - **Developers**:  
-  The **backend** of the project was developed by **Nazmi KOÇAK**. For more information about the developer, please visit the [LinkedIn profile](https://www.linkedin.com/in/nazmikocak/).  
-  The **frontend** of the project was developed by **Hamza Ali DOĞAN**. For more details, you can visit the [frontend repository](https://github.com/HamzaDogann/ChatNest).  
+  The **backend** of the project was developed by **ali nouri**. For more information about the developer, please visit the [LinkedIn profile](https://www.linkedin.com/in/alinouri1989/).  
+  The **frontend** of the project was developed by **ali nouri**. For more details, you can visit the [frontend repository](https://github.com/alinouri1989/ChatNest).  
 
-- **Feedback and Support**:  
-  If you have any feedback or need support, feel free to contact me at [nazmikocak.dev@hotmail.com].  
-  For questions or issues related to the frontend, you can reach out to **Hamza Ali DOĞAN** at [hamzaalidogantr@gmail.com].  
