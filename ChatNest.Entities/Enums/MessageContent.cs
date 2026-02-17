@@ -1,8 +1,8 @@
 ﻿namespace ChatNest.Entities.Enums
 {
     /// <summary>
-    /// Mesaj içeriğini temsil eden enum.
-    /// Mesajın içeriğinin türünü belirtir (Metin, Görsel, Video, Ses, Dosya).
+    /// enum نمایانگر محتوای پیام.
+    /// نوع محتوای پیام را مشخص می‌کند (متن، تصویر، ویدیو، صدا، فایل).
     /// </summary>
     public enum MessageContent
     {

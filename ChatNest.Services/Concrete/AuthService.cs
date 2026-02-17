@@ -115,7 +115,7 @@ namespace ChatNest.Services.Concrete
             }
             else
             {
-                throw new NotFoundException("Kullanıcı bulunamadı.");
+                throw new NotFoundException("کاربر یافت نشد.");
             }
         }
     }

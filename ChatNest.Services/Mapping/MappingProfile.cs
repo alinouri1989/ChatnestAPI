@@ -8,18 +8,18 @@ using UserInfo = ChatNest.Shared.DTOs.Response.UserInfo;
 namespace ChatNest.Services.Mapping
 {
     /// <summary>
-    /// AutoMapper profil sınıfı, nesne dönüştürme işlemleri için harita tanımlar.
+    /// کلاس پروفایل AutoMapper برای تبدیل اشیا نگاشت‌ها را تعریف می‌کند.
     /// </summary>
     public sealed class MappingProfile : Profile
     {
         /// <summary>
-        /// MappingProfile sınıfının yeni bir örneğini oluşturur ve nesneler arasındaki dönüşüm haritalarını yapılandırır.
+        /// یک نمونه جدید از کلاس MappingProfile می‌سازد و نگاشت‌های تبدیل بین اشیا را پیکربندی می‌کند.
         /// </summary>
         public MappingProfile()
         {
             // SignUp => User
             CreateMap<SignUp, User>()
-                .ForMember(dest => dest.Biography, opt => opt.MapFrom(src => "Merhaba, ben ChatNest kullanıyorum."))
+                .ForMember(dest => dest.Biography, opt => opt.MapFrom(src => "سلام، من از ChatNest استفاده می‌کنم."))
                 .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(src => "https://res.cloudinary.com/ChatNest-realtime-messaging-app/image/upload/v1744980054/DefaultUserProfilePhoto.png"))
                 .ForMember(dest => dest.ProviderId, opt => opt.MapFrom(src => "email"))
                 .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(src => DateTime.UtcNow))
@@ -34,7 +34,7 @@ namespace ChatNest.Services.Mapping
                 .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
                 .ForMember(dest => dest.PhoneNumber, opt => opt.MapFrom(src => src.PhoneNumber))
-                .ForMember(dest => dest.Biography, opt => opt.MapFrom(src => "Merhaba, ben ChatNest kullanıyorum."))
+                .ForMember(dest => dest.Biography, opt => opt.MapFrom(src => "سلام، من از ChatNest استفاده می‌کنم."))
                 .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(src => new Uri(src.PhotoURL)))
                 .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.BirthDate, opt => opt.MapFrom(src => DateTime.MinValue))

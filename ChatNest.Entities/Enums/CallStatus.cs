@@ -1,8 +1,8 @@
 ﻿namespace ChatNest.Entities.Enums
 {
     /// <summary>
-    /// Çağrı durumlarını temsil eden enum.
-    /// Bir çağrının mevcut durumunu belirtir (Beklemede, Kabul Edildi, Reddedildi, İptal Edildi, Cevapsız Kaldı).
+    /// enum نمایانگر وضعیت‌های تماس.
+    /// وضعیت فعلی تماس را مشخص می‌کند (در انتظار، پذیرفته‌شده، ردشده، لغوشده، بی‌پاسخ).
     /// </summary>
     public enum CallStatus
     {

@@ -3,8 +3,8 @@
 namespace ChatNest.Entities.Models
 {
     /// <summary>
-    /// Kullanıcı ayarlarını temsil eden sınıf.
-    /// Kullanıcının tema tercihi ve sohbet arka planı gibi kişisel ayarlarını içerir.
+    /// کلاس نمایانگر تنظیمات کاربر.
+    /// تنظیمات شخصی کاربر مانند تم و پس‌زمینه گفتگو را شامل می‌شود.
     /// </summary>
     public sealed class UserSettings
     {

@@ -3,7 +3,7 @@
 namespace ChatNest.Shared.DTOs.Response
 {
     /// <summary>
-    /// Gruptaki katılımcının rolü ve temel bilgilerini içeren veri transfer nesnesi (DTO).
+    /// شیء انتقال داده (DTO) شامل نقش و اطلاعات پایه عضو گروه.
     /// </summary>
     public sealed record ParticipantProfile
     {

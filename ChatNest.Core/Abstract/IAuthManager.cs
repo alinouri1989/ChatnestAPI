@@ -3,25 +3,25 @@
 namespace ChatNest.Core.Abstract
 {
     /// <summary>
-    /// Kullanıcı doğrulama işlemleri için bir sözleşme sağlayan arayüz.
-    /// Bu arayüz, farklı sağlayıcılara yönelik oturum açma doğrulama işlemleri sağlar.
+    /// رابطی که قرارداد عملیات اعتبارسنجی کاربر را ارائه می‌دهد.
+    /// این رابط اعتبارسنجی ورود برای ارائه‌دهنده‌های مختلف را فراهم می‌کند.
     /// </summary>
     public interface IAuthManager
     {
         /// <summary>
-        /// Google sağlayıcısı üzerinden oturum açma işlemini doğrular.
+        /// ورود از طریق ارائه‌دهنده Google را اعتبارسنجی می‌کند.
         /// </summary>
-        /// <param name="dto">Sağlayıcı bilgilerini içeren <see cref="SignInProvider"/> nesnesi.</param>
-        /// <returns>Doğrulamanın sonucunu ve hata mesajını içeren bir tuple döner. IsValid = false ise hata mesajı içerir.</returns>
+        /// <param name="dto">شیء <see cref="SignInProvider"/> شامل اطلاعات ارائه‌دهنده.</param>
+        /// <returns>تاپل شامل نتیجه اعتبارسنجی و پیام خطا را برمی‌گرداند. اگر IsValid = false باشد، پیام خطا دارد.</returns>
         (bool IsValid, string ErrorMessage) ValidateGoogleProvider(SignInProvider dto);
 
 
 
         /// <summary>
-        /// Facebook sağlayıcısı üzerinden oturum açma işlemini doğrular.
+        /// ورود از طریق ارائه‌دهنده Facebook را اعتبارسنجی می‌کند.
         /// </summary>
-        /// <param name="dto">Sağlayıcı bilgilerini içeren <see cref="SignInProvider"/> nesnesi.</param>
-        /// <returns>Doğrulamanın sonucunu ve hata mesajını içeren bir tuple döner. IsValid = false ise hata mesajı içerir.</returns>
+        /// <param name="dto">شیء <see cref="SignInProvider"/> شامل اطلاعات ارائه‌دهنده.</param>
+        /// <returns>تاپل شامل نتیجه اعتبارسنجی و پیام خطا را برمی‌گرداند. اگر IsValid = false باشد، پیام خطا دارد.</returns>
         (bool IsValid, string ErrorMessage) ValidateFacebookProvider(SignInProvider dto);
     }
 }

@@ -3,7 +3,7 @@
 namespace ChatNest.Shared.DTOs.Response
 {
     /// <summary>
-    /// Kullanıcıların alıcı olarak profil bilgilerini içeren veri transfer nesnesi (DTO).
+    /// شیء انتقال داده (DTO) شامل اطلاعات پروفایل کاربران به‌عنوان گیرنده.
     /// </summary>
     public sealed record RecipientProfile
     {

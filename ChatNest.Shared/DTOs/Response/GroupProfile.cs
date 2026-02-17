@@ -1,7 +1,7 @@
 ﻿namespace ChatNest.Shared.DTOs.Response
 {
     /// <summary>
-    /// Grup profilinin temel bilgilerini ve katılımcı listesini içeren veri transfer nesnesi (DTO).
+    /// شیء انتقال داده (DTO) شامل اطلاعات پایه پروفایل گروه و فهرست اعضا.
     /// </summary>
     public sealed record GroupProfile
     {

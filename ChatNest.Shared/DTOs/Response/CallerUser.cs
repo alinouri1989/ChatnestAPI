@@ -1,7 +1,7 @@
 ﻿namespace ChatNest.Shared.DTOs.Response
 {
     /// <summary>
-    /// Kullanıcının temel bilgilerini içeren veri transfer nesnesi (DTO).
+    /// شیء انتقال داده (DTO) شامل اطلاعات پایه کاربر.
     /// </summary>
     public sealed record CallerUser
     {

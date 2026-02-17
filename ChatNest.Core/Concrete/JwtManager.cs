@@ -8,11 +8,11 @@ using System.Text;
 namespace ChatNest.Core.Concrete
 {
     /// <summary>
-    /// JSON Web Token (JWT) oluşturma işlemlerini yöneten sınıf.
+    /// کلاسی که فرایند تولید JSON Web Token (JWT) را مدیریت می‌کند.
     /// </summary>
     /// <remarks>
-    /// Bu sınıf, JWT oluşturma işlemini gerçekleştirmek için gerekli yapılandırmaları
-    /// alır ve <see cref="GenerateToken"/> metoduyla token üretir.
+    /// این کلاس تنظیمات لازم برای تولید JWT را دریافت می‌کند
+    /// و با متد <see cref="GenerateToken"/> توکن ایجاد می‌کند.
     /// </remarks>
     public sealed class JwtManager : IJwtManager
     {
@@ -24,10 +24,10 @@ namespace ChatNest.Core.Concrete
 
 
         /// <summary>
-        /// <see cref="JwtManager"/> sınıfının yapıcı metodudur.
-        /// JWT yapılandırma ayarlarını almak için <see cref="IConfiguration"/> nesnesi kullanır.
+        /// سازنده کلاس <see cref="JwtManager"/> است.
+        /// برای دریافت تنظیمات JWT از شیء <see cref="IConfiguration"/> استفاده می‌کند.
         /// </summary>
-        /// <param name="configuration">JWT ayarlarını içeren <see cref="IConfiguration"/> nesnesi.</param>
+        /// <param name="configuration">شیء <see cref="IConfiguration"/> شامل تنظیمات JWT.</param>
         public JwtManager(IConfiguration configuration)
         {
             _secret = configuration["JWT:SecretKey"];
@@ -39,11 +39,11 @@ namespace ChatNest.Core.Concrete
 
 
         /// <summary>
-        /// Verilen kullanıcı kimliği için bir JSON Web Token (JWT) oluşturur.
+        /// برای شناسه کاربر داده‌شده یک JSON Web Token (JWT) ایجاد می‌کند.
         /// </summary>
-        /// <param name="userId">JWT'yi oluşturmak için kullanılacak kullanıcı kimliği.</param>
-        /// <returns>Oluşturulan JWT'yi temsil eden bir dize döner.</returns>
-        /// <exception cref="ArgumentNullException">Geçersiz veya eksik yapılandırma verisi durumunda fırlatılır.</exception>
+        /// <param name="userId">شناسه کاربری که برای تولید JWT استفاده می‌شود.</param>
+        /// <returns>رشته‌ای که JWT تولیدشده را نمایش می‌دهد.</returns>
+        /// <exception cref="ArgumentNullException">در صورت نامعتبر یا ناقص بودن داده‌های پیکربندی پرتاب می‌شود.</exception>
         public string GenerateToken(string userId)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));

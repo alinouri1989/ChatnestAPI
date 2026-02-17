@@ -1,8 +1,8 @@
 ﻿namespace ChatNest.Entities.Enums
 {
     /// <summary>
-    /// Kullanıcı arayüzü temasını temsil eden enum.
-    /// Sistem temasını belirtir (Varsayılan Sistem Modu, Açık, Koyu).
+    /// enum نمایانگر تم رابط کاربری.
+    /// تم سیستم را مشخص می‌کند (حالت پیش‌فرض سیستم، روشن، تیره).
     /// </summary>
     public enum Theme
     {

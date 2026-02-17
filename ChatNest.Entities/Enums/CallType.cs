@@ -1,8 +1,8 @@
 ﻿namespace ChatNest.Entities.Enums
 {
     /// <summary>
-    /// Çağrı türlerini temsil eden enum.
-    /// Bir çağrının türünü belirtir (Sesli, Görüntülü).
+    /// enum نمایانگر انواع تماس.
+    /// نوع تماس را مشخص می‌کند (صوتی، تصویری).
     /// </summary>
     public enum CallType
     {

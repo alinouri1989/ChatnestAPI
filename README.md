@@ -227,7 +227,7 @@ In this phase, we focused on creating a clear and organized folder structure for
 
 By setting up the folder structure in an efficient way, we ensured that the project would be scalable and maintainable in the long run. This organization helped both the development team and future contributors easily find and update the necessary files without confusion.
 
-![klasör](https://github.com/user-attachments/assets/613156b6-a554-4aad-96a1-1ef7e02d86f2)
+![پوشه](https://github.com/user-attachments/assets/613156b6-a554-4aad-96a1-1ef7e02d86f2)
 
 ___
 

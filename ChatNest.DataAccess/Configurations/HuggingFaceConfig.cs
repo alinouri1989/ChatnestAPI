@@ -3,30 +3,30 @@
 namespace ChatNest.DataAccess.Configurations
 {
     public class HuggingFaceConfig
-    {        /// <summary>Hugging Face API anahtarını içerir.</summary>
+    {        /// <summary>کلید API سرویس Hugging Face را شامل می‌شود.</summary>
         public string ApiKey { get; }
 
 
 
-        /// <summary>FLUX modelini kullanarak görsel üretimi için API URL'sini içerir.</summary>
+        /// <summary>آدرس API برای تولید تصویر با مدل FLUX را شامل می‌شود.</summary>
         public string FluxImage { get; }
 
 
 
-        /// <summary>Artples modelini kullanarak görsel üretimi için API URL'sini içerir.</summary>
+        /// <summary>آدرس API برای تولید تصویر با مدل Artples را شامل می‌شود.</summary>
         public string ArtplesImage { get; }
 
 
 
-        /// <summary>CompVis modelini kullanarak görsel üretimi için API URL'sini içerir.</summary>
+        /// <summary>آدرس API برای تولید تصویر با مدل CompVis را شامل می‌شود.</summary>
         public string CompvisImage { get; }
 
 
 
         /// <summary>
-        /// Hugging Face yapılandırmasını belirtilen <see cref="IConfiguration"/> nesnesine göre başlatır.
+        /// پیکربندی Hugging Face را بر اساس شیء <see cref="IConfiguration"/> مقداردهی اولیه می‌کند.
         /// </summary>
-        /// <param name="configuration">Uygulamanın yapılandırma ayarlarını içeren <see cref="IConfiguration"/> nesnesi.</param>
+        /// <param name="configuration">شیء <see cref="IConfiguration"/> شامل تنظیمات پیکربندی برنامه.</param>
         public HuggingFaceConfig(IConfiguration configuration)
         {
             var apiKey = configuration["HuggingFace:apiKey"]!;

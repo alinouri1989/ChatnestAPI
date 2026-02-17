@@ -1,16 +1,16 @@
 ﻿namespace ChatNest.Core.Abstract
 {
     /// <summary>
-    /// JSON Web Token (JWT) oluşturma işlemi için bir sözleşme sağlayan arayüz.
+    /// رابطی که قرارداد تولید JSON Web Token (JWT) را تعریف می‌کند.
     /// </summary>
     public interface IJwtManager
     {
         /// <summary>
-        /// Verilen kullanıcı kimliği için bir JWT oluşturur.
+        /// برای شناسه کاربر داده‌شده یک JWT ایجاد می‌کند.
         /// </summary>
-        /// <param name="userId">JWT'yi oluşturmak için kullanılacak kullanıcı kimliği.</param>
-        /// <returns>Oluşturulan JWT'yi temsil eden bir dize döner.</returns>
-        /// <exception cref="ArgumentNullException">Geçersiz veya eksik yapılandırma verisi durumunda fırlatılır.</exception>
+        /// <param name="userId">شناسه کاربری که برای تولید JWT استفاده می‌شود.</param>
+        /// <returns>رشته‌ای که JWT تولیدشده را نمایش می‌دهد.</returns>
+        /// <exception cref="ArgumentNullException">در صورت نامعتبر یا ناقص بودن داده‌های پیکربندی پرتاب می‌شود.</exception>
         string GenerateToken(string userId);
     }
 }

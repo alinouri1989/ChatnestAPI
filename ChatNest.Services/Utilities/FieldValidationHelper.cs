@@ -4,22 +4,22 @@ using System.Text.RegularExpressions;
 namespace ChatNest.Services.Utilities
 {
     /// <summary>
-    /// Alan doğrulama işlemleri için yardımcı sınıf.
+    /// کلاس کمکی برای اعتبارسنجی فیلدها.
     /// </summary>
     internal static class FieldValidationHelper
     {
         /// <summary>
-        /// Verilen alanların boş olup olmadığını kontrol eder ve boş olanlar için BadRequestException fırlatır.
+        /// بررسی می‌کند فیلدهای داده‌شده خالی نباشند و برای موارد خالی BadRequestException پرتاب می‌کند.
         /// </summary>
-        /// <param name="fields">Kontrol edilecek alanlar ve isimleri</param>
-        /// <exception cref="BadRequestException">Eğer herhangi bir alan boşsa, exception fırlatılır.</exception>
+        /// <param name="fields">فیلدهایی که باید بررسی شوند به‌همراه نام آن‌ها</param>
+        /// <exception cref="BadRequestException">اگر هر فیلدی خالی باشد، استثنا پرتاب می‌شود.</exception>
         public static void ValidateRequiredFields(params (string Value, string FieldName)[] fields)
         {
             foreach (var (value, fieldName) in fields)
             {
                 if (String.IsNullOrEmpty(value))
                 {
-                    throw new BadRequestException($"{fieldName} gereklidir.");
+                    throw new BadRequestException($"{fieldName} الزامی است.");
                 }
             }
         }
@@ -27,22 +27,22 @@ namespace ChatNest.Services.Utilities
 
 
         /// <summary>
-        /// E-posta adresinin formatını doğrular. Geçerli formatta değilse BadRequestException fırlatır.
+        /// قالب آدرس ایمیل را اعتبارسنجی می‌کند. اگر معتبر نباشد، BadRequestException پرتاب می‌کند.
         /// </summary>
-        /// <param name="email">Doğrulanacak e-posta adresi</param>
-        /// <param name="fieldName">E-posta adresi alanının adı (varsayılan olarak "Email")</param>
-        /// <exception cref="BadRequestException">Eğer e-posta formatı geçerli değilse, exception fırlatılır.</exception>
+        /// <param name="email">آدرس ایمیلی که باید اعتبارسنجی شود</param>
+        /// <param name="fieldName">نام فیلد آدرس ایمیل (به‌صورت پیش‌فرض "Email")</param>
+        /// <exception cref="BadRequestException">اگر قالب ایمیل معتبر نباشد، استثنا پرتاب می‌شود.</exception>
         public static void ValidateEmailFormat(string email, string fieldName = "Email")
         {
             if (string.IsNullOrEmpty(email))
             {
-                throw new BadRequestException($"{fieldName} gereklidir.");
+                throw new BadRequestException($"{fieldName} الزامی است.");
             }
 
             string emailPattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
             if (!Regex.IsMatch(email, emailPattern))
             {
-                throw new BadRequestException($"{fieldName} geçerli bir e-posta adresi değil.");
+                throw new BadRequestException($"{fieldName} یک آدرس ایمیل معتبر نیست.");
             }
         }
     }

@@ -3,16 +3,16 @@
 namespace ChatNest.Services.Utilities
 {
     /// <summary>
-    /// Dosya doğrulama işlemleri için yardımcı sınıf.
+    /// کلاس کمکی برای اعتبارسنجی فایل‌ها.
     /// </summary>
     internal static class FileValidationHelper
     {
         /// <summary>
-        /// Fotoğraf dosyasını doğrular. Dosyanın boyutu 2 MB'dan fazla ise BadRequestException fırlatır.
+        /// فایل عکس را اعتبارسنجی می‌کند. اگر حجم فایل بیشتر از 2 مگابایت باشد، BadRequestException پرتاب می‌کند.
         /// </summary>
-        /// <param name="base64File">Base64 formatında fotoğraf verisi</param>
-        /// <returns>Fotoğrafın bellek akışını döner.</returns>
-        /// <exception cref="BadRequestException">Eğer fotoğraf boyutu 2 MB'dan fazla ise exception fırlatılır.</exception>
+        /// <param name="base64File">داده عکس در قالب Base64</param>
+        /// <returns>جریان حافظه عکس را برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">اگر حجم عکس بیشتر از 2 مگابایت باشد، استثنا پرتاب می‌شود.</exception>
         public static MemoryStream ValidatePhoto(string base64File)
         {
             var photoBytes = Convert.FromBase64String(base64File);
@@ -22,7 +22,7 @@ namespace ChatNest.Services.Utilities
 
             if (photo.Length > maxFileSize)
             {
-                throw new BadRequestException($"Fotoğraf boyutu en fazla 2 MB olmalıdır.");
+                throw new BadRequestException($"حجم عکس باید حداکثر 2 مگابایت باشد.");
             }
 
             return photo;
@@ -31,11 +31,11 @@ namespace ChatNest.Services.Utilities
 
 
         /// <summary>
-        /// Video dosyasını doğrular. Dosyanın boyutu 100 MB'dan fazla ise BadRequestException fırlatır.
+        /// فایل ویدیو را اعتبارسنجی می‌کند. اگر حجم فایل بیشتر از 100 مگابایت باشد، BadRequestException پرتاب می‌کند.
         /// </summary>
-        /// <param name="base64File">Base64 formatında video verisi</param>
-        /// <returns>Videonun bellek akışını döner.</returns>
-        /// <exception cref="BadRequestException">Eğer video boyutu 100 MB'dan fazla ise exception fırlatılır.</exception>
+        /// <param name="base64File">داده ویدیو در قالب Base64</param>
+        /// <returns>جریان حافظه ویدیو را برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">اگر حجم ویدیو بیشتر از 100 مگابایت باشد، استثنا پرتاب می‌شود.</exception>
         public static MemoryStream ValidateVideo(string base64File)
         {
             var videoBytes = Convert.FromBase64String(base64File);
@@ -45,7 +45,7 @@ namespace ChatNest.Services.Utilities
 
             if (video.Length > maxFileSize)
             {
-                throw new BadRequestException($"Video boyutu en fazla 100 MB olmalıdır.");
+                throw new BadRequestException($"حجم ویدیو باید حداکثر 100 مگابایت باشد.");
             }
 
             return video;
@@ -54,11 +54,11 @@ namespace ChatNest.Services.Utilities
 
 
         /// <summary>
-        /// Genel dosya doğrulaması yapar. Dosyanın boyutu 200 MB'dan fazla ise BadRequestException fırlatır.
+        /// اعتبارسنجی عمومی فایل را انجام می‌دهد. اگر حجم فایل بیشتر از 200 مگابایت باشد، BadRequestException پرتاب می‌کند.
         /// </summary>
-        /// <param name="base64File">Base64 formatında dosya verisi</param>
-        /// <returns>Dosyanın bellek akışını döner.</returns>
-        /// <exception cref="BadRequestException">Eğer dosya boyutu 200 MB'dan fazla ise exception fırlatılır.</exception>
+        /// <param name="base64File">داده فایل در قالب Base64</param>
+        /// <returns>جریان حافظه فایل را برمی‌گرداند.</returns>
+        /// <exception cref="BadRequestException">اگر حجم فایل بیشتر از 200 مگابایت باشد، استثنا پرتاب می‌شود.</exception>
         public static MemoryStream ValidateFile(string base64File)
         {
             var fileBytes = Convert.FromBase64String(base64File);
@@ -68,7 +68,7 @@ namespace ChatNest.Services.Utilities
 
             if (file.Length > maxFileSize)
             {
-                throw new BadRequestException($"Dosya boyutu en fazla 200 MB olmalıdır.");
+                throw new BadRequestException($"حجم فایل باید حداکثر 200 مگابایت باشد.");
             }
 
             return file;

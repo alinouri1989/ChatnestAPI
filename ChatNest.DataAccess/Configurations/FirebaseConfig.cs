@@ -6,24 +6,24 @@ using Microsoft.Extensions.Configuration;
 namespace ChatNest.DataAccess.Configurations
 {
     /// <summary>
-    /// Firebase kimlik doğrulama ve veritabanı erişim yapılandırmasını yönetir.
+    /// پیکربندی احراز هویت فایربیس و دسترسی به پایگاه داده را مدیریت می‌کند.
     /// </summary>
     public class FirebaseConfig
     {
-        /// <summary> Firebase kimlik doğrulama işlemleri için kullanılan istemci nesnesidir.</summary>
+        /// <summary>شیء کلاینت مورد استفاده برای عملیات احراز هویت فایربیس.</summary>
         public FirebaseAuthClient AuthClient { get; }
 
 
 
-        /// <summary> Firebase Realtime Database ile iletişim kurmak için kullanılan istemci nesnesidir.</summary>
+        /// <summary>شیء کلاینت مورد استفاده برای برقراری ارتباط با Firebase Realtime Database.</summary>
         public FirebaseClient DatabaseClient { get; }
 
 
 
         // <summary>
-        /// Firebase kimlik doğrulama ve veritabanı istemcilerini belirtilen <see cref="IConfiguration"/> nesnesine göre yapılandırır.
+        /// کلاینت‌های احراز هویت و پایگاه داده فایربیس را بر اساس شیء <see cref="IConfiguration"/> پیکربندی می‌کند.
         /// </summary>
-        /// <param name="configuration">Uygulamanın yapılandırma ayarlarını içeren <see cref="IConfiguration"/> nesnesi.</param>
+        /// <param name="configuration">شیء <see cref="IConfiguration"/> شامل تنظیمات پیکربندی برنامه.</param>
         public FirebaseConfig(IConfiguration configuration)
         {
             var apiKey = configuration["Firebase:apiKey"];

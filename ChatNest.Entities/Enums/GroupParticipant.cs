@@ -1,8 +1,8 @@
 ﻿namespace ChatNest.Entities.Enums
 {
     /// <summary>
-    /// Grup katılımcısı rollerini temsil eden enum.
-    /// Bir grup içerisindeki kullanıcının rolünü belirtir (Yönetici, Üye, Eski Üye).
+    /// enum نمایانگر نقش‌های اعضای گروه.
+    /// نقش کاربر در یک گروه را مشخص می‌کند (مدیر، عضو، عضو سابق).
     /// </summary>
     public enum GroupParticipant
     {
