@@ -17,7 +17,8 @@ namespace ChatNest.DataAccess.Concrete
 
         public async Task CreateOrUpdateGroupAsync(Group group)
         {
-            if (group.Id == Guid.Empty)
+            var existGroup = _context.Groups.Any(c => c.Id == group.Id);
+            if (!existGroup)
             {
                 group.Id = Guid.NewGuid();
                 group.CreatedDate = DateTime.UtcNow;
@@ -28,7 +29,7 @@ namespace ChatNest.DataAccess.Concrete
                 _context.Groups.Update(group);
             }
 
-            await _context.SaveChangesAsync();
+            await _context.SaveWithConcurrencyRetryAsync();
         }
 
         public async Task<IEnumerable<Group>> GetAllGroupsAsync()

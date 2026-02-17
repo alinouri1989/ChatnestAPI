@@ -1,9 +1,8 @@
 ﻿using AutoMapper;
 using ChatNest.Entities.Models;
+using ChatNest.Shared;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
-using User = ChatNest.Entities.Models.User;
-using UserInfo = ChatNest.Shared.DTOs.Response.UserInfo;
 
 namespace ChatNest.Services.Mapping
 {
@@ -17,32 +16,42 @@ namespace ChatNest.Services.Mapping
         /// </summary>
         public MappingProfile()
         {
+            // ✅ Converters (حل مشکل Guid <-> string و Uri <-> string)
+            CreateMap<string, Guid>().ConvertUsing(src => Utility.ParseGuidOrThrow(src));
+
+            CreateMap<Uri, string>().ConvertUsing(src => src == null ? null : src.ToString());
+
+            CreateMap<string, Uri>().ConvertUsing(src =>
+                string.IsNullOrWhiteSpace(src)
+                    ? null
+                    : new Uri(src, UriKind.RelativeOrAbsolute)
+            );
+
             // SignUp => User
             CreateMap<SignUp, User>()
-                .ForMember(dest => dest.Biography, opt => opt.MapFrom(src => "سلام، من از ChatNest استفاده می‌کنم."))
-                .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(src => new Uri("/Image/DefaultUserProfilePhoto.png", UriKind.Relative)))
-                .ForMember(dest => dest.ProviderId, opt => opt.MapFrom(src => "email"))
-                .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(src => DateTime.UtcNow))
-                .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(src => new UserSettings()))
-                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.Biography, opt => opt.MapFrom(_ => "سلام، من از ChatNest استفاده می‌کنم."))
+                .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(_ => new Uri("/Image/DefaultUserProfilePhoto.png", UriKind.Relative)))
+                .ForMember(dest => dest.ProviderId, opt => opt.MapFrom(_ => "email"))
+                .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(_ => DateTime.UtcNow))
+                .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(_ => new UserSettings()))
+                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(_ => DateTime.UtcNow))
                 .ForMember(dest => dest.Id, opt => opt.Ignore())
                 .ForMember(dest => dest.UserSettingsJson, opt => opt.Ignore());
-
 
             // ProviderData => User
             CreateMap<ProviderData, User>()
                 .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
                 .ForMember(dest => dest.PhoneNumber, opt => opt.MapFrom(src => src.PhoneNumber))
-                .ForMember(dest => dest.Biography, opt => opt.MapFrom(src => "سلام، من از ChatNest استفاده می‌کنم."))
-                .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(src => new Uri(src.PhotoURL)))
-                .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(src => DateTime.UtcNow))
-                .ForMember(dest => dest.BirthDate, opt => opt.MapFrom(src => DateTime.MinValue))
-                .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(src => new UserSettings()))
-                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.Biography, opt => opt.MapFrom(_ => "سلام، من از ChatNest استفاده می‌کنم."))
+                .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(src => new Uri(src.PhotoURL, UriKind.RelativeOrAbsolute)))
+                .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(_ => DateTime.UtcNow))
+                .ForMember(dest => dest.BirthDate, opt => opt.MapFrom(_ => DateTime.MinValue))
+                .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(_ => new UserSettings()))
+                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(_ => DateTime.UtcNow))
                 .ForMember(dest => dest.Id, opt => opt.Ignore());
 
-
+            // User => UserInfo (اگر UserInfo فیلد Uri/String دارد، Converter بالا مشکل را حل می‌کند)
             // User => UserInfo
             CreateMap<User, UserInfo>();
 
@@ -58,10 +67,17 @@ namespace ChatNest.Services.Mapping
             // User => CallerUser
             CreateMap<User, CallerUser>();
 
-            // Group mappings
             CreateMap<Group, GroupProfile>()
-                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.ToString()))
-                .ForMember(dest => dest.PhotoUrl, opt => opt.MapFrom(src => src.Photo != null ? src.Photo.ToString() : null));
+                .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id.ToString()))
+                .ForMember(d => d.PhotoUrl, opt => opt.MapFrom(s => s.Photo))
+                .ForMember(d => d.Participants, opt => opt.Ignore()); // ✅ کلیدی
+
+            CreateMap<GroupProfile, Group>()
+                .ForMember(d => d.Id, opt => opt.MapFrom(s => Guid.Parse(s.Id)))
+                .ForMember(d => d.Photo, opt => opt.MapFrom(s => s.PhotoUrl))
+                .ForMember(d => d.Participants, opt => opt.Ignore())      // ✅ NotMapped
+                .ForMember(d => d.ParticipantsJson, opt => opt.Ignore()); // ✅ دستی ست می‌کنیم
+
         }
     }
 }

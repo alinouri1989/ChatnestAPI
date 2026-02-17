@@ -220,5 +220,32 @@ namespace ChatNest.DataAccess.Contexts
                 entity.HasIndex(cp => cp.ChatId).HasDatabaseName("IX_ChatParticipants_ChatId");
             });
         }
+
+        public async Task SaveWithConcurrencyRetryAsync()
+        {
+            try
+            {
+                await SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                // رکورد تغییر کرده/حذف شده
+                foreach (var entry in ex.Entries)
+                {
+                    // اگر رکورد حذف شده باشد:
+                    var databaseValues = await entry.GetDatabaseValuesAsync();
+                    if (databaseValues == null)
+                    {
+                        throw new NotFoundException("Entity was deleted by another operation.");
+                    }
+
+                    // رکورد هنوز هست، مقادیر دیتابیس را می‌گیریم و روی entry می‌ریزیم
+                    entry.OriginalValues.SetValues(databaseValues);
+                }
+
+                // دوباره تلاش
+                await SaveChangesAsync();
+            }
+        }
     }
 }

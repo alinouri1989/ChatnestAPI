@@ -73,14 +73,22 @@ public class ChatRepository : IChatRepository
             UserId = userId,
             JoinedAt = DateTime.UtcNow
         };
+        try
+        {
 
-        _context.Set<ChatParticipant>().Add(participant);
-        await _context.SaveChangesAsync();
+            _context.ChatParticipants.Add(participant);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
     }
 
     public async Task RemoveParticipantAsync(Guid chatId, string userId)
     {
-        var participant = await _context.Set<ChatParticipant>()
+        var participant = await _context.ChatParticipants
             .FirstOrDefaultAsync(cp => cp.ChatId == chatId && cp.UserId == userId);
 
         if (participant != null)
@@ -92,7 +100,7 @@ public class ChatRepository : IChatRepository
 
     public async Task<List<string>> GetChatParticipantsAsync(Guid chatId)
     {
-        return await _context.Set<ChatParticipant>()
+        return await _context.ChatParticipants
             .Where(cp => cp.ChatId == chatId)
             .Select(cp => cp.UserId)
             .ToListAsync();

@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -145,7 +146,11 @@ builder.Services.AddHttpClient();
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 // Add SignalR
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+                .AddJsonProtocol(options =>
+                {
+                    options.PayloadSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+                });
 
 // Add Controllers
 builder.Services.AddControllers();
