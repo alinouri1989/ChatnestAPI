@@ -84,7 +84,7 @@ namespace ChatNest.Services.Concrete
                 await _userManager.UpdateAsync(appUser);
             }
 
-            return new Uri("https://example.com/default-avatar.png");
+            return new Uri("/Image/DefaultUserProfilePhoto.png", UriKind.Relative);
         }
 
         public async Task<Uri> UpdateProfilePhotoAsync(string userId, UpdateProfilePhoto dto)
