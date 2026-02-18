@@ -8,19 +8,57 @@ namespace ChatNest.Services.Concrete
     public sealed class ChatService : IChatService
     {
         private readonly IChatRepository _chatRepository;
+        private readonly IGroupRepository _groupRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IMessageRepository _messageRepository;
         private readonly IMapper _mapper;
 
-        public ChatService(IChatRepository chatRepository, IUserRepository userRepository, IMapper mapper)
+        public ChatService(
+            IChatRepository chatRepository,
+            IGroupRepository groupRepository,
+            IUserRepository userRepository,
+            IMessageRepository messageRepository,
+            IMapper mapper)
         {
             _chatRepository = chatRepository;
+            _groupRepository = groupRepository;
             _userRepository = userRepository;
+            _messageRepository = messageRepository;
             _mapper = mapper;
         }
 
         public async Task<Dictionary<string, Chat>> CreateChatAsync(string userId, string chatType, string recipientId)
         {
-            var participants = new List<string> { userId, recipientId };
+            List<string> participants;
+
+            if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!Guid.TryParse(recipientId, out var groupId))
+                    throw new BadRequestException("Invalid group id");
+
+                participants = await _groupRepository.GetGroupParticipantsIdsAsync(groupId);
+                if (participants == null || !participants.Any())
+                    throw new NotFoundException("Group has no participants");
+
+                if (!participants.Contains(userId))
+                    throw new ForbiddenException("Access denied");
+            }
+            else
+            {
+                participants = new List<string> { userId, recipientId };
+            }
+
+            participants = participants
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct()
+                .ToList();
+
+            foreach (var participantId in participants)
+            {
+                var user = await _userRepository.GetUserByIdAsync(participantId);
+                if (user == null)
+                    throw new NotFoundException($"User not found: {participantId}");
+            }
 
             // Check if chat already exists by checking participants
             var existingChat = await _chatRepository.GetChatByParticipantsAsync(participants);
@@ -151,24 +189,28 @@ namespace ChatNest.Services.Concrete
 
         public async Task<Dictionary<string, Dictionary<string, Chat>>> ClearChatAsync(string userId, string chatType, string chatId)
         {
-            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            var chatGuid = Guid.Parse(chatId);
+            var chat = await _chatRepository.GetChatByIdAsync(chatGuid);
             if (chat == null)
                 throw new NotFoundException("Chat not found");
 
             // Check if user is participant
-            var participants = await _chatRepository.GetChatParticipantsAsync(Guid.Parse(chatId));
+            var participants = await _chatRepository.GetChatParticipantsAsync(chatGuid);
             if (!participants.Contains(userId))
                 throw new NotFoundException("Access denied");
 
-            // Clear messages for this user (mark them as deleted)
-            // This would require updating the message repository to mark messages as deleted for this user
-            // For now, we'll just return the updated chat structure
+            var clearedAt = DateTime.UtcNow;
+            foreach (var message in chat.Messages)
+            {
+                var deletedFor = message.DeletedFor;
+                deletedFor[userId] = clearedAt;
+                await _messageRepository.UpdateMessageDeletedForAsync(message.Id, deletedFor);
+            }
 
-            var updatedChats = await _chatRepository.GetChatsByUserIdAsync(userId);
-            var filteredChats = updatedChats.Where(c => c.ChatType == chatType);
+            var updatedChat = await _chatRepository.GetChatByIdAsync(chatGuid);
             var result = new Dictionary<string, Dictionary<string, Chat>>
             {
-                { chatType, filteredChats.ToDictionary(c => c.Id.ToString(), c => c) }
+                { chatType, new Dictionary<string, Chat> { { chatId, updatedChat! } } }
             };
 
             return result;

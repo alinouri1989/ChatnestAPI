@@ -7,6 +7,7 @@ using ChatNest.Services.Exceptions;
 using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using Microsoft.AspNetCore.Identity;
+using System.Linq;
 
 namespace ChatNest.Services.Concrete
 {
@@ -76,32 +77,62 @@ namespace ChatNest.Services.Concrete
 
         public async Task<string> SignInGoogleAsync(SignInProvider dto)
         {
-            // Implement Google sign-in logic
             var user = await _userRepository.GetUserByProviderIdAsync(dto.Uid);
+            var providerData = dto.ProviderData?.FirstOrDefault();
+
+            if (user == null && !string.IsNullOrWhiteSpace(providerData?.Email))
+            {
+                user = await _userRepository.GetUserByEmailAsync(providerData.Email);
+            }
+
+            if (user == null && providerData != null)
+            {
+                user = _mapper.Map<User>(providerData);
+                user.ProviderId = dto.Uid;
+                await _userRepository.CreateUserAsync(user);
+            }
+            else if (user != null && user.ProviderId != dto.Uid)
+            {
+                user.ProviderId = dto.Uid;
+                await _userRepository.UpdateUserAsync(user);
+            }
 
             if (user == null)
             {
-                user = _mapper.Map<User>(dto.ProviderData[0]);
-                user.ProviderId = "google.com";
-                await _userRepository.CreateUserAsync(user);
+                throw new BadRequestException("Invalid provider payload");
             }
 
-            return await Task.Run(() => _jwtManager.GenerateToken(dto.Uid));
+            return await Task.Run(() => _jwtManager.GenerateToken(user.Id));
         }
 
         public async Task<string> SignInFacebookAsync(SignInProvider dto)
         {
-            // Implement Facebook sign-in logic
             var user = await _userRepository.GetUserByProviderIdAsync(dto.Uid);
+            var providerData = dto.ProviderData?.FirstOrDefault();
+
+            if (user == null && !string.IsNullOrWhiteSpace(providerData?.Email))
+            {
+                user = await _userRepository.GetUserByEmailAsync(providerData.Email);
+            }
+
+            if (user == null && providerData != null)
+            {
+                user = _mapper.Map<User>(providerData);
+                user.ProviderId = dto.Uid;
+                await _userRepository.CreateUserAsync(user);
+            }
+            else if (user != null && user.ProviderId != dto.Uid)
+            {
+                user.ProviderId = dto.Uid;
+                await _userRepository.UpdateUserAsync(user);
+            }
 
             if (user == null)
             {
-                user = _mapper.Map<User>(dto.ProviderData[0]);
-                user.ProviderId = "facebook.com";
-                await _userRepository.CreateUserAsync(user);
+                throw new BadRequestException("Invalid provider payload");
             }
 
-            return await Task.Run(() => _jwtManager.GenerateToken(dto.Uid));
+            return await Task.Run(() => _jwtManager.GenerateToken(user.Id));
         }
 
         public async Task ResetPasswordAsync(string email)

@@ -27,7 +27,8 @@ namespace ChatNest.API.Controllers
                 var identity = HttpContext?.User?.Identity as ClaimsIdentity;
                 return identity?
                     .FindFirst(ClaimTypes.NameIdentifier)?
-                    .Value!;
+                    .Value
+                    ?? identity?.FindFirst("sub")?.Value!;
             }
         }
     }

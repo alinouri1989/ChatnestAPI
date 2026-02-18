@@ -40,21 +40,26 @@ namespace ChatNest.DataAccess.Concrete
             var message = await _context.Messages.FindAsync(messageId);
             if (message != null)
             {
+                var status = message.Status ?? new MessageStatus();
+                status.Delivered ??= new Dictionary<string, DateTime>();
+                status.Read ??= new Dictionary<string, DateTime>();
+
                 if (fieldName == "Delivered")
                 {
                     foreach (var kvp in fieldData)
                     {
-                        message.Status.Delivered[kvp.Key] = kvp.Value;
+                        status.Delivered[kvp.Key] = kvp.Value;
                     }
                 }
                 else if (fieldName == "Read")
                 {
                     foreach (var kvp in fieldData)
                     {
-                        message.Status.Read[kvp.Key] = kvp.Value;
+                        status.Read[kvp.Key] = kvp.Value;
                     }
                 }
 
+                message.Status = status;
                 await _context.SaveChangesAsync();
             }
         }

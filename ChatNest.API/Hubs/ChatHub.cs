@@ -33,7 +33,8 @@ namespace ChatNest.API.Hubs
             get
             {
                 var identity = Context?.User?.Identity as ClaimsIdentity;
-                var userId = identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? identity?.FindFirst("sub")?.Value;
 
                 if (string.IsNullOrEmpty(userId))
                     throw new UnauthorizedAccessException("User ID not found in token");
