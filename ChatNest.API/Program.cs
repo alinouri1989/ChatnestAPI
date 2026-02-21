@@ -1,4 +1,4 @@
-using ChatNest.API.Hubs;
+﻿using ChatNest.API.Hubs;
 using ChatNest.Core.Abstract;
 using ChatNest.Core.Concrete;
 using ChatNest.DataAccess.Abstract;
@@ -155,15 +155,22 @@ builder.Services.AddSignalR()
 // Add Controllers
 builder.Services.AddControllers();
 
-// Add CORS
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var allowedMethods = builder.Configuration.GetSection("Cors:AllowedMethods").Get<string[]>() ?? Array.Empty<string>();
+var allowedHeaders = builder.Configuration.GetSection("Cors:AllowedHeaders").Get<string[]>() ?? Array.Empty<string>();
+var allowCredentials = builder.Configuration.GetValue<bool>("Cors:AllowCredentials");
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("_myAllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins("https://localhost:5173", "http://localhost:5173", "http://localhost:3000", "https://localhost:3000") // Add your frontend URLs
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials(); // Important for SignalR
+              .WithHeaders(allowedHeaders.Length > 0 ? allowedHeaders : ["Content-Type", "Authorization"])
+              .SetPreflightMaxAge(TimeSpan.FromHours(1))
+              .SetIsOriginAllowedToAllowWildcardSubdomains();
+        if (allowCredentials) policy.AllowCredentials();
+
     });
 });
 
@@ -182,19 +189,34 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
+//app.UseHttpsRedirection();
+//app.UseStaticFiles();
+//app.UseRouting();
+//app.UseCors("_myAllowSpecificOrigins");
+//app.UseAuthentication();
+//app.UseAuthorization();
+
+//app.MapControllers();
+
+//app.MapHub<ChatHub>("hub/Chat");
+//app.MapHub<CallHub>("hub/Call");
+//app.MapHub<NotificationHub>("hub/Notification");
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseCors("AllowAll");
+
 app.UseRouting();
+
+app.UseCors("_myAllowSpecificOrigins");  // ✅ بعد از Routing
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireCors("_myAllowSpecificOrigins");
 
-app.MapHub<ChatHub>("hub/Chat");
-app.MapHub<CallHub>("hub/Call");
-app.MapHub<NotificationHub>("hub/Notification");
+app.MapHub<ChatHub>("/hub/Chat").RequireCors("_myAllowSpecificOrigins");
+app.MapHub<CallHub>("/hub/Call").RequireCors("_myAllowSpecificOrigins");
+app.MapHub<NotificationHub>("/hub/Notification").RequireCors("_myAllowSpecificOrigins");
 
 using (var scope = app.Services.CreateScope())
 {
