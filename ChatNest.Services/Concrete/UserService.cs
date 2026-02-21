@@ -3,6 +3,7 @@ using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
+using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Identity;
@@ -92,30 +93,39 @@ namespace ChatNest.Services.Concrete
             var user = await _userRepository.GetUserByIdAsync(userId);
             if (user == null)
                 throw new NotFoundException("User not found");
-            byte[] photoBytes;
 
             var base64Data = dto.ProfilePhoto.Contains(',') ? dto.ProfilePhoto.Split(',')[1] : dto.ProfilePhoto;
-            photoBytes = Convert.FromBase64String(base64Data);
-
-            using var photoStream = new MemoryStream(photoBytes);
-            var photoUrl = await _cloudRepository.UploadPhotoAsync(
-                $"profile_{userId}",
-                "profiles",
-                "profile,user",
-                photoStream);
-
-            user.ProfilePhoto = photoUrl;
-            await _userRepository.UpdateUserAsync(user);
-
-            // Also update Identity user
-            var appUser = await _userManager.FindByIdAsync(userId);
-            if (appUser != null)
+            MemoryStream photoStream;
+            try
             {
-                appUser.ProfilePhoto = photoUrl;
-                await _userManager.UpdateAsync(appUser);
+                photoStream = FileValidationHelper.ValidatePhoto(base64Data);
+            }
+            catch (FormatException)
+            {
+                throw new BadRequestException("فرمت عکس پروفایل نامعتبر است.");
             }
 
-            return photoUrl;
+            using (photoStream)
+            {
+                var photoUrl = await _cloudRepository.UploadPhotoAsync(
+                    $"profile_{userId}",
+                    "profiles",
+                    "profile,user",
+                    photoStream);
+
+                user.ProfilePhoto = photoUrl;
+                await _userRepository.UpdateUserAsync(user);
+
+                // Also update Identity user
+                var appUser = await _userManager.FindByIdAsync(userId);
+                if (appUser != null)
+                {
+                    appUser.ProfilePhoto = photoUrl;
+                    await _userManager.UpdateAsync(appUser);
+                }
+
+                return photoUrl;
+            }
         }
 
         public async Task UpdateDisplayNameAsync(string userId, UpdateDisplayName dto)
@@ -191,7 +201,9 @@ namespace ChatNest.Services.Concrete
             if (user == null)
                 throw new NotFoundException("User not found");
 
-            user.UserSettings.Theme = dto.Theme;
+            var userSettings = user.UserSettings;
+            userSettings.Theme = dto.Theme;
+            user.UserSettings = userSettings;
             await _userRepository.UpdateUserAsync(user);
         }
 
@@ -201,8 +213,9 @@ namespace ChatNest.Services.Concrete
             if (user == null)
                 throw new NotFoundException("User not found");
 
-            // Assuming you have a ChatBackground property in UserSettings
-            // user.UserSettings.ChatBackground = dto.ChatBackground;
+            var userSettings = user.UserSettings;
+            userSettings.ChatBackground = dto.ChatBackground;
+            user.UserSettings = userSettings;
             await _userRepository.UpdateUserAsync(user);
         }
 

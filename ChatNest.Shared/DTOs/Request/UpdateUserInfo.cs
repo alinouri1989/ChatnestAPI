@@ -80,7 +80,7 @@ namespace ChatNest.Shared.DTOs.Request
     public sealed record ChangeChatBackground
     {
         [Required(ErrorMessage = "لطفاً یک رنگ انتخاب کنید.")]
-        [RegularExpression(@"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "لطفاً یک کد رنگ معتبر وارد کنید (مثال: #FF0000).")]
+        [RegularExpression(@"^(color[1-9]|#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3}))$", ErrorMessage = "لطفاً یک رنگ معتبر وارد کنید (مثال: color1 یا #FF0000).")]
         public string ChatBackground { get; init; }
     }
 }
