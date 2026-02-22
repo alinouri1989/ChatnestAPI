@@ -14,18 +14,18 @@ namespace ChatNest.Services.Concrete
     {
         private readonly IGroupRepository _groupRepository;
         private readonly IUserRepository _userRepository;
-        private readonly ICloudRepository _cloudRepository;
+        private readonly IMediaStorageRepository _mediaStorageRepository;
         private readonly IMapper _mapper;
 
         public GroupService(
             IGroupRepository groupRepository,
             IUserRepository userRepository,
-            ICloudRepository cloudRepository,
+            IMediaStorageRepository mediaStorageRepository,
             IMapper mapper)
         {
             _groupRepository = groupRepository;
             _userRepository = userRepository;
-            _cloudRepository = cloudRepository;
+            _mediaStorageRepository = mediaStorageRepository;
             _mapper = mapper;
         }
 
@@ -94,7 +94,7 @@ namespace ChatNest.Services.Concrete
                 var photoBytes = Convert.FromBase64String(base64Data);
 
                 using var photoStream = new MemoryStream(photoBytes);
-                var photoUrl = await _cloudRepository.UploadPhotoAsync(
+                var photoUrl = await _mediaStorageRepository.UploadPhotoAsync(
                     $"group_{group.Id}",
                     "groups",
                     "group,photo",
@@ -132,7 +132,7 @@ namespace ChatNest.Services.Concrete
                 var photoBytes = Convert.FromBase64String(base64Data);
 
                 using var photoStream = new MemoryStream(photoBytes);
-                var photoUrl = await _cloudRepository.UploadPhotoAsync(
+                var photoUrl = await _mediaStorageRepository.UploadPhotoAsync(
                     $"group_{group.Id}",
                     "groups",
                     "group,photo",

@@ -7,9 +7,9 @@ namespace ChatNest.DataAccess.Contexts
 {
     public static class ApplicationBuilderExtensions
     {
-        public static async Task SeedIdentityDataAsync(this IServiceCollection app)
+        public static async Task SeedIdentityDataAsync(this IServiceProvider services)
         {
-            using var scope = app.BuildServiceProvider().CreateScope();
+            using var scope = services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ChatNestDbContext>();
             var users = new List<User>();
             var roles = new List<Role>() { new Role {Id= Guid.NewGuid().ToString(),Name = "Admin", NormalizedName = "Admin", ConcurrencyStamp = Guid.NewGuid().ToString() },
@@ -43,30 +43,6 @@ namespace ChatNest.DataAccess.Contexts
                     MobileConfirmed = true,
                     Firstname = "علی",
                     Lastname = "نوری",
-                    PasswordHash = passwordHasher.HashPassword(null,"Aa123456")
-                },new User {
-                    Id = Guid.NewGuid().ToString(),
-                    UserName = "SpecialSupport",
-                    NormalizedUserName = "SPECIALSUPPORT",
-                    Email = "SpecialSupport@gmail.com",
-                    NormalizedEmail = "SPECIALSUPPORT@GMAIL.COM",
-                    LockoutEnabled = false,
-                    Firstname = "پشتیبان خاص",
-                    Lastname = "اول",
-                    MobileNo = "09217579859",
-                    MobileConfirmed = true,
-                    PasswordHash = passwordHasher.HashPassword(null,"Aa123456")
-                },new User {
-                    Id = Guid.NewGuid().ToString(),
-                    UserName = "Support",
-                    NormalizedUserName = "SUPPORT",
-                    Email = "Support@gmail.com",
-                    NormalizedEmail = "SUPPORT@GMAIL.COM",
-                    LockoutEnabled = false,
-                    Firstname = "پشتیبان",
-                    Lastname = "اول",
-                    MobileNo= "09352408400",
-                    MobileConfirmed = true,
                     PasswordHash = passwordHasher.HashPassword(null,"Aa123456")
                 }};
 

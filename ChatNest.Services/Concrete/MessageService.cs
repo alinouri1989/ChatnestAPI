@@ -12,18 +12,18 @@ namespace ChatNest.Services.Concrete
     {
         private readonly IMessageRepository _messageRepository;
         private readonly IChatRepository _chatRepository;
-        private readonly ICloudRepository _cloudRepository;
+        private readonly IMediaStorageRepository _mediaStorageRepository;
         private readonly IMapper _mapper;
 
         public MessageService(
             IMessageRepository messageRepository,
             IChatRepository chatRepository,
-            ICloudRepository cloudRepository,
+            IMediaStorageRepository mediaStorageRepository,
             IMapper mapper)
         {
             _messageRepository = messageRepository;
             _chatRepository = chatRepository;
-            _cloudRepository = cloudRepository;
+            _mediaStorageRepository = mediaStorageRepository;
             _mapper = mapper;
         }
 
@@ -36,6 +36,7 @@ namespace ChatNest.Services.Concrete
 
             var message = new Message
             {
+                Id = Guid.NewGuid(),
                 SenderId = userId,
                 ChatId = Guid.Parse(chatId),
                 Content = dto.Content,
@@ -49,6 +50,20 @@ namespace ChatNest.Services.Concrete
                 }
             };
 
+            // Current clients send files as Base64 in Content via SignalR.
+            // Normalize to dto.File so storage upload logic is reused.
+            if (dto.ContentType != MessageContent.Text && dto.File == null && !string.IsNullOrWhiteSpace(dto.Content))
+            {
+                try
+                {
+                    dto.File = Convert.FromBase64String(dto.Content);
+                }
+                catch (FormatException)
+                {
+                    throw new BadRequestException("Invalid file payload");
+                }
+            }
+
             // Handle file uploads
             if (dto.ContentType != MessageContent.Text && dto.File != null)
             {
@@ -59,16 +74,16 @@ namespace ChatNest.Services.Concrete
                 switch (dto.ContentType)
                 {
                     case MessageContent.Image:
-                        fileUrl = await _cloudRepository.UploadPhotoAsync($"message_{message.Id}", "messages", "message,image", fileStream);
+                        fileUrl = await _mediaStorageRepository.UploadPhotoAsync($"message_{message.Id}", "messages", "message,image", fileStream, dto.FileName);
                         break;
                     case MessageContent.Video:
-                        fileUrl = await _cloudRepository.UploadVideoAsync($"message_{message.Id}", "messages", "message,video", fileStream);
+                        fileUrl = await _mediaStorageRepository.UploadVideoAsync($"message_{message.Id}", "messages", "message,video", fileStream, dto.FileName);
                         break;
                     case MessageContent.Audio:
-                        fileUrl = await _cloudRepository.UploadAudioAsync($"message_{message.Id}", "messages", "message,audio", fileStream);
+                        fileUrl = await _mediaStorageRepository.UploadAudioAsync($"message_{message.Id}", "messages", "message,audio", fileStream, dto.FileName);
                         break;
                     case MessageContent.File:
-                        var (url, size) = await _cloudRepository.UploadFileAsync($"message_{message.Id}", "messages", "message,file", fileStream);
+                        var (url, size) = await _mediaStorageRepository.UploadFileAsync($"message_{message.Id}", "messages", "message,file", fileStream, dto.FileName);
                         fileUrl = url;
                         fileSize = size;
                         break;
@@ -79,6 +94,10 @@ namespace ChatNest.Services.Concrete
                 message.Content = fileUrl.ToString();
                 message.FileName = dto.FileName;
                 message.FileSize = fileSize;
+            }
+            else if (dto.ContentType != MessageContent.Text)
+            {
+                throw new BadRequestException("File payload is required for non-text messages");
             }
 
             await _messageRepository.CreateMessageAsync(message);

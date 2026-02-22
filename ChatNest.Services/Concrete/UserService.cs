@@ -13,18 +13,18 @@ namespace ChatNest.Services.Concrete
     public sealed class UserService : IUserService
     {
         private readonly IUserRepository _userRepository;
-        private readonly ICloudRepository _cloudRepository;
+        private readonly IMediaStorageRepository _mediaStorageRepository;
         private readonly UserManager<User> _userManager;
         private readonly IMapper _mapper;
 
         public UserService(
             IUserRepository userRepository,
-            ICloudRepository cloudRepository,
+            IMediaStorageRepository mediaStorageRepository,
             UserManager<User> userManager,
             IMapper mapper)
         {
             _userRepository = userRepository;
-            _cloudRepository = cloudRepository;
+            _mediaStorageRepository = mediaStorageRepository;
             _userManager = userManager;
             _mapper = mapper;
         }
@@ -107,7 +107,7 @@ namespace ChatNest.Services.Concrete
 
             using (photoStream)
             {
-                var photoUrl = await _cloudRepository.UploadPhotoAsync(
+                var photoUrl = await _mediaStorageRepository.UploadPhotoAsync(
                     $"profile_{userId}",
                     "profiles",
                     "profile,user",
