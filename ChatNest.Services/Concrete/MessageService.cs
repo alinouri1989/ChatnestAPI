@@ -126,7 +126,14 @@ namespace ChatNest.Services.Concrete
                 if (message.SenderId != userId)
                     throw new BadRequestException("You can only delete your own messages for everyone");
 
-                await _messageRepository.DeleteMessageAsync(Guid.Parse(messageId));
+                // Use a tombstone payload instead of physical deletion so clients can update UI
+                // consistently (e.g., "This message was deleted") without losing message identity.
+                message.Content = "این پیام حذف شده است.";
+                message.Type = MessageContent.Text;
+                message.FileName = null;
+                message.FileSize = null;
+
+                await _messageRepository.UpdateMessageAsync(message);
             }
             else // Delete for me only
             {
