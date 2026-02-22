@@ -61,6 +61,9 @@ namespace ChatNest.Services.Concrete
             if (!participants.Contains(userId))
                 throw new NotFoundException("Access denied");
 
+            if (call.Status == CallStatus.Accepted || call.Status == CallStatus.Ongoing)
+                return;
+
             if (call.Status != CallStatus.Pending)
                 throw new BadRequestException("Call is not in pending state");
 
