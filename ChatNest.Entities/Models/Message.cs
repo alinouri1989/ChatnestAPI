@@ -51,6 +51,9 @@ public sealed class Message
 
     public DateTime CreatedDate { get; set; }
 
+    [NotMapped]
+    public string? ClientMessageId { get; set; }
+
     // Navigation properties
     [ForeignKey("SenderId")]
     public User? Sender { get; set; }

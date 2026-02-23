@@ -41,6 +41,7 @@ namespace ChatNest.Services.Concrete
                 ChatId = Guid.Parse(chatId),
                 Content = dto.Content,
                 Type = dto.ContentType,
+                ClientMessageId = dto.ClientMessageId,
                 CreatedDate = DateTime.UtcNow,
                 Status = new MessageStatus
                 {

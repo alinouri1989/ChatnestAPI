@@ -15,6 +15,7 @@ namespace ChatNest.Shared.DTOs.Request
 
         [Required(ErrorMessage = "لطفاً یک پیام وارد کنید.")]
         public string Content { get; init; }
+        public string? ClientMessageId { get; init; }
         public byte[]? File { get; set; }
         public string? FileName { get; set; }
     }
