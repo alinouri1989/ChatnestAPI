@@ -67,7 +67,7 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.UtcNow);
+                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.MinValue);
                 await base.OnConnectedAsync();
             }
             catch (Exception ex)
@@ -530,7 +530,8 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.UtcNow);
+                var lastConnectionDate = isOnline ? DateTime.MinValue : DateTime.UtcNow;
+                await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
 
                 // Notify all contacts about the status change
                 // This would require getting user's contacts first

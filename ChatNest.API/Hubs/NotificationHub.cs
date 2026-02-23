@@ -102,18 +102,18 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                // Set user as online (using current time instead of MinValue)
-                DateTime connectionDate = DateTime.UtcNow;
-                await _userService.UpdateLastConnectionDateAsync(UserId, connectionDate);
+                // Convention used by clients: DateTime.MinValue means "online"
+                DateTime onlineMarker = DateTime.MinValue;
+                await _userService.UpdateLastConnectionDateAsync(UserId, onlineMarker);
 
                 // Notify others that user is now online
                 await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
                 {
-                    { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", connectionDate } } }
+                    { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", onlineMarker } } }
                 });
 
                 // Send successful initialization response
-                await Clients.Caller.SendAsync("NotificationHubInitialized", new { status = "connected", timestamp = connectionDate });
+                await Clients.Caller.SendAsync("NotificationHubInitialized", new { status = "connected", timestamp = DateTime.UtcNow });
             }
             catch (Exception ex)
             {
