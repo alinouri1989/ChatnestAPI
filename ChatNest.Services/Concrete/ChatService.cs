@@ -30,11 +30,14 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, Chat>> CreateChatAsync(string userId, string chatType, string recipientId)
         {
             List<string> participants;
+            Guid? linkedGroupId = null;
 
             if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
             {
                 if (!Guid.TryParse(recipientId, out var groupId))
                     throw new BadRequestException("Invalid group id");
+
+                linkedGroupId = groupId;
 
                 participants = await _groupRepository.GetGroupParticipantsIdsAsync(groupId);
                 if (participants == null || !participants.Any())
@@ -42,6 +45,12 @@ namespace ChatNest.Services.Concrete
 
                 if (!participants.Contains(userId))
                     throw new ForbiddenException("Access denied");
+
+                var existingGroupChat = await _chatRepository.GetChatByIdAsync(groupId);
+                if (existingGroupChat != null && existingGroupChat.ChatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new Dictionary<string, Chat> { { existingGroupChat.Id.ToString(), existingGroupChat } };
+                }
             }
             else
             {
@@ -60,17 +69,20 @@ namespace ChatNest.Services.Concrete
                     throw new NotFoundException($"User not found: {participantId}");
             }
 
-            // Check if chat already exists by checking participants
-            var existingChat = await _chatRepository.GetChatByParticipantsAsync(participants);
-            if (existingChat != null)
+            // Check if chat already exists by checking participants (individual chats only)
+            if (!linkedGroupId.HasValue)
             {
-                return new Dictionary<string, Chat> { { existingChat.Id.ToString(), existingChat } };
+                var existingChat = await _chatRepository.GetChatByParticipantsAsync(participants);
+                if (existingChat != null && existingChat.ChatType.Equals("Individual", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new Dictionary<string, Chat> { { existingChat.Id.ToString(), existingChat } };
+                }
             }
 
             // Create new chat
             var chat = new Chat
             {
-                Id = Guid.NewGuid(),
+                Id = linkedGroupId ?? Guid.NewGuid(),
                 ChatType = chatType,
                 CreatedDate = DateTime.UtcNow
             };
@@ -95,14 +107,15 @@ namespace ChatNest.Services.Concrete
             try
             {
                 var userChats = await _chatRepository.GetUserChatsAsync(userId);
+                var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
                 var result = new Dictionary<string, Dictionary<string, Chat>>();
                 var individualParticipants = new List<string>();
-                var groupParticipants = new List<string>();
+                var userGroupIds = userGroups.Select(g => g.Id.ToString()).Distinct().ToList();
 
                 // Ensure we always have valid collections
                 if (userChats == null || !userChats.Any())
                 {
-                    return (result, individualParticipants, groupParticipants);
+                    return (result, individualParticipants, userGroupIds);
                 }
 
                 var individualChats = userChats.Where(c => c.ChatType == "Individual")
@@ -144,25 +157,6 @@ namespace ChatNest.Services.Concrete
                 if (groupChats.Any())
                 {
                     result.Add("Group", groupChats);
-
-                    // Get participants from junction table for group chats
-                    foreach (var chat in groupChats.Values)
-                    {
-                        try
-                        {
-                            var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
-                            if (participants != null)
-                            {
-                                groupParticipants.AddRange(participants.Where(p => p != userId));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log the exception but continue processing
-                            Console.WriteLine($"Error getting participants for chat {chat.Id}: {ex.Message}");
-                        }
-                    }
-                    groupParticipants = groupParticipants.Distinct().ToList();
                 }
                 else
                 {
@@ -170,7 +164,7 @@ namespace ChatNest.Services.Concrete
                     result.Add("Group", new Dictionary<string, Chat>());
                 }
 
-                return (result, individualParticipants, groupParticipants);
+                return (result, individualParticipants, userGroupIds);
             }
             catch (Exception ex)
             {

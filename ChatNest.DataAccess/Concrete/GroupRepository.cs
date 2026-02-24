@@ -20,8 +20,16 @@ namespace ChatNest.DataAccess.Concrete
             var existGroup = _context.Groups.Any(c => c.Id == group.Id);
             if (!existGroup)
             {
-                group.Id = Guid.NewGuid();
-                group.CreatedDate = DateTime.UtcNow;
+                if (group.Id == Guid.Empty)
+                {
+                    group.Id = Guid.NewGuid();
+                }
+
+                if (group.CreatedDate == default)
+                {
+                    group.CreatedDate = DateTime.UtcNow;
+                }
+
                 _context.Groups.Add(group);
             }
             else
@@ -78,11 +86,14 @@ namespace ChatNest.DataAccess.Concrete
 
         public async Task<IEnumerable<Group>> GetUserGroupsAsync(string userId)
         {
-            return await _context.Groups
-                .Where(g => g.Participants.ContainsKey(userId) &&
-                           g.Participants[userId] != GroupParticipant.Former)
+            var groups = await _context.Groups
                 .Include(g => g.Creator)
                 .ToListAsync();
+
+            return groups
+                .Where(g => g.Participants.ContainsKey(userId) &&
+                            g.Participants[userId] != GroupParticipant.Former)
+                .ToList();
         }
     }
 }

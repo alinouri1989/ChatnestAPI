@@ -13,20 +13,62 @@ namespace ChatNest.Services.Concrete
     public sealed class GroupService : IGroupService
     {
         private readonly IGroupRepository _groupRepository;
+        private readonly IChatRepository _chatRepository;
         private readonly IUserRepository _userRepository;
         private readonly IMediaStorageRepository _mediaStorageRepository;
         private readonly IMapper _mapper;
 
         public GroupService(
             IGroupRepository groupRepository,
+            IChatRepository chatRepository,
             IUserRepository userRepository,
             IMediaStorageRepository mediaStorageRepository,
             IMapper mapper)
         {
             _groupRepository = groupRepository;
+            _chatRepository = chatRepository;
             _userRepository = userRepository;
             _mediaStorageRepository = mediaStorageRepository;
             _mapper = mapper;
+        }
+
+        private static Dictionary<string, GroupParticipant> BuildParticipantsFromRequest(
+            CreateGroup dto,
+            string creatorUserId,
+            Dictionary<string, GroupParticipant>? fallbackParticipants = null)
+        {
+            var participants = fallbackParticipants != null
+                ? new Dictionary<string, GroupParticipant>(fallbackParticipants)
+                : new Dictionary<string, GroupParticipant>();
+
+            if (!string.IsNullOrWhiteSpace(dto.Participants))
+            {
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<Dictionary<string, GroupParticipant>>(dto.Participants)
+                                 ?? new Dictionary<string, GroupParticipant>();
+
+                    participants = parsed
+                        .Where(p => !string.IsNullOrWhiteSpace(p.Key))
+                        .ToDictionary(p => p.Key, p => p.Value);
+                }
+                catch (JsonException)
+                {
+                    throw new BadRequestException("Participants payload is invalid.");
+                }
+            }
+            else if (dto.SelectedParticipants != null)
+            {
+                participants = dto.SelectedParticipants
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .Distinct()
+                    .ToDictionary(p => p, _ => GroupParticipant.Member);
+            }
+
+            participants.Remove(string.Empty);
+            participants[creatorUserId] = GroupParticipant.Admin;
+
+            return participants;
         }
 
         private async Task<GroupProfile> MapGroupToProfileSafeAsync(Group group)
@@ -71,19 +113,7 @@ namespace ChatNest.Services.Concrete
                 CreatedDate = DateTime.UtcNow,
             };
 
-            var participants = new Dictionary<string, GroupParticipant>
-            {
-                { userId, GroupParticipant.Admin }
-            };
-
-            if (dto.SelectedParticipants != null)
-            {
-                foreach (var participantId in dto.SelectedParticipants)
-                {
-                    if (!string.IsNullOrWhiteSpace(participantId) && participantId != userId)
-                        participants[participantId] = GroupParticipant.Member;
-                }
-            }
+            var participants = BuildParticipantsFromRequest(dto, userId);
 
             group.ParticipantsJson = JsonSerializer.Serialize(participants);
 
@@ -125,6 +155,8 @@ namespace ChatNest.Services.Concrete
 
             group.Name = dto.Name;
             group.Description = dto.Description ?? string.Empty;
+            group.ParticipantsJson = JsonSerializer.Serialize(
+                BuildParticipantsFromRequest(dto, group.CreatedBy, group.Participants));
 
             if (!string.IsNullOrWhiteSpace(dto.Photo))
             {
@@ -185,15 +217,43 @@ namespace ChatNest.Services.Concrete
             if (group == null || !group.Participants.ContainsKey(userId))
                 throw new NotFoundException("Group not found or you're not a member");
 
-            if (group.CreatedBy == userId)
-                throw new BadRequestException("Group creator cannot leave. Transfer ownership or delete the group instead.");
-
             var participants = group.Participants;
             participants[userId] = GroupParticipant.Former;
+            var isCreatorLeaving = group.CreatedBy == userId;
+
+            var remainingActiveParticipants = participants
+                .Where(p => p.Key != userId && p.Value != GroupParticipant.Former)
+                .ToList();
+
+            if (isCreatorLeaving)
+            {
+                if (!remainingActiveParticipants.Any())
+                {
+                    group.ParticipantsJson = JsonSerializer.Serialize(participants);
+
+                    await _chatRepository.RemoveParticipantAsync(gid, userId);
+                    await _chatRepository.DeleteChatAsync(gid);
+                    await _groupRepository.DeleteGroupAsync(gid);
+
+                    var deletedGroupProfile = await MapGroupToProfileSafeAsync(group);
+                    return new Dictionary<string, GroupProfile>
+                    {
+                        { group.Id.ToString(), deletedGroupProfile }
+                    };
+                }
+
+                var nextOwner = remainingActiveParticipants
+                    .FirstOrDefault(p => p.Value == GroupParticipant.Admin).Key
+                    ?? remainingActiveParticipants.First().Key;
+
+                participants[nextOwner] = GroupParticipant.Admin;
+                group.CreatedBy = nextOwner;
+            }
 
             group.ParticipantsJson = JsonSerializer.Serialize(participants);
 
-            await _groupRepository.UpdateGroupParticipantsAsync(gid, participants);
+            await _groupRepository.CreateOrUpdateGroupAsync(group);
+            await _chatRepository.RemoveParticipantAsync(gid, userId);
 
             var profile = await MapGroupToProfileSafeAsync(group);
 
