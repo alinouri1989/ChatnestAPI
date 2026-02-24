@@ -9,6 +9,8 @@ namespace ChatNest.Shared.DTOs.Response
     {
         public required string DisplayName { get; init; }
 
+        public string? UserIdentifier { get; init; }
+
         public required string Email { get; init; }
 
         public required string Biography { get; init; }

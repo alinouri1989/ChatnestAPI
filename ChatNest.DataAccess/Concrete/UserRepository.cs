@@ -88,7 +88,8 @@ namespace ChatNest.DataAccess.Concrete
         {
             return await _context.Users
                 .Where(u => u.DisplayName.Contains(searchTerm) ||
-                           u.Email.Contains(searchTerm))
+                           u.Email.Contains(searchTerm) ||
+                           (u.UserIdentifier != null && u.UserIdentifier.Contains(searchTerm)))
                 .ToListAsync();
         }
     }

@@ -44,10 +44,14 @@ namespace ChatNest.Services.Concrete
             {
                 UserName = dto.Email,
                 Email = dto.Email,
-                DisplayName = dto.DisplayName,
+                DisplayName = dto.DisplayName.Trim(),
                 BirthDate = dto.BirthDate.ToShortDateString(),
                 CreatedDate = DateTime.UtcNow,
             };
+
+            identityUser.UserIdentifier = await UserIdentifierHelper.GenerateUniqueAsync(
+                _userManager,
+                identityUser.DisplayName);
 
             var result = await _userManager.CreateAsync(identityUser, dto.Password);
 
@@ -89,6 +93,9 @@ namespace ChatNest.Services.Concrete
             {
                 user = _mapper.Map<User>(providerData);
                 user.ProviderId = dto.Uid;
+                user.UserIdentifier = await UserIdentifierHelper.GenerateUniqueAsync(
+                    _userManager,
+                    user.DisplayName);
                 await _userRepository.CreateUserAsync(user);
             }
             else if (user != null && user.ProviderId != dto.Uid)
@@ -119,6 +126,9 @@ namespace ChatNest.Services.Concrete
             {
                 user = _mapper.Map<User>(providerData);
                 user.ProviderId = dto.Uid;
+                user.UserIdentifier = await UserIdentifierHelper.GenerateUniqueAsync(
+                    _userManager,
+                    user.DisplayName);
                 await _userRepository.CreateUserAsync(user);
             }
             else if (user != null && user.ProviderId != dto.Uid)

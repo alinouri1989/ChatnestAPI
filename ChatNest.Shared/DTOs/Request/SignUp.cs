@@ -10,7 +10,7 @@ namespace ChatNest.Shared.DTOs.Request
     {
         [Required(ErrorMessage = "لطفاً نام و نام خانوادگی خود را وارد کنید.")]
         [StringLength(50, MinimumLength = 5, ErrorMessage = "نام و نام خانوادگی شما باید حداقل 5 و حداکثر 50 کاراکتر باشد.")]
-        [RegularExpression(@"^(?!.*\d)[\u0600-\u06FFA-Za-z]+(?: [\u0600-\u06FFA-Za-z]+)*$", ErrorMessage = "نام و نام خانوادگی شما فقط باید از حروف تشکیل شده و بین کلمات یک فاصله باشد.")]
+        [RegularExpression(@"^(?=.*[\u0600-\u06FFA-Za-z0-9])[\u0600-\u06FFA-Za-z0-9 ]+$", ErrorMessage = "نام نمایشی فقط می‌تواند شامل حروف فارسی/انگلیسی، عدد و فاصله باشد.")]
         public string DisplayName { get; init; }
 
         [Required(ErrorMessage = "لطفاً آدرس ایمیل خود را وارد کنید.")]

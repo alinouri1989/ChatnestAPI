@@ -54,6 +54,13 @@ namespace ChatNest.Services.Abstract
         Task UpdateDisplayNameAsync(string userId, UpdateDisplayName dto);
 
         /// <summary>
+        /// شناسه عمومی کاربر را به‌روزرسانی می‌کند.
+        /// </summary>
+        /// <param name="userId">شناسه داخلی کاربر.</param>
+        /// <param name="dto">شناسه عمومی جدید.</param>
+        Task UpdateUserIdentifierAsync(string userId, UpdateUserIdentifier dto);
+
+        /// <summary>
         /// شماره تلفن کاربر را به‌روزرسانی می‌کند.
         /// </summary>
         /// <param name="userId">شناسه کاربری که شماره تلفن آن به‌روزرسانی می‌شود.</param>

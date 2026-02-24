@@ -29,6 +29,9 @@ public class User : IdentityUser
     [Required, MaxLength(100)]
     public string DisplayName { get; set; } = string.Empty;
 
+    [MaxLength(30)]
+    public string? UserIdentifier { get; set; }
+
     // ❌ Remove this too - IdentityUser already has PhoneNumber
     // [Phone]
     // public string? PhoneNumber { get; set; } = string.Empty;

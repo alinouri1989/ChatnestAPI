@@ -81,9 +81,13 @@ namespace ChatNest.DataAccess.Contexts
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Email).IsRequired();
                 entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.UserIdentifier).HasMaxLength(30);
                 entity.Property(e => e.PhoneNumber).HasMaxLength(15);
                 entity.Property(e => e.Biography).HasMaxLength(500);
                 entity.Property(e => e.ProviderId).IsRequired().HasMaxLength(100);
+                entity.HasIndex(e => e.UserIdentifier)
+                      .IsUnique()
+                      .HasFilter("[UserIdentifier] IS NOT NULL");
 
                 entity.Property(e => e.ProfilePhoto)
                       .HasConversion(

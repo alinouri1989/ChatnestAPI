@@ -49,6 +49,22 @@ namespace ChatNest.Services.Concrete
             if (user == null)
                 throw new NotFoundException("User not found");
 
+            if (string.IsNullOrWhiteSpace(user.UserIdentifier))
+            {
+                user.UserIdentifier = await UserIdentifierHelper.GenerateUniqueAsync(
+                    _userManager,
+                    user.DisplayName,
+                    user.Id);
+                await _userRepository.UpdateUserAsync(user);
+
+                var appUser = await _userManager.FindByIdAsync(userId);
+                if (appUser != null)
+                {
+                    appUser.UserIdentifier = user.UserIdentifier;
+                    await _userManager.UpdateAsync(appUser);
+                }
+            }
+
             return _mapper.Map<UserInfo>(user);
         }
 
@@ -134,14 +150,43 @@ namespace ChatNest.Services.Concrete
             if (user == null)
                 throw new NotFoundException("User not found");
 
-            user.DisplayName = dto.DisplayName;
+            user.DisplayName = dto.DisplayName.Trim();
             await _userRepository.UpdateUserAsync(user);
 
             // Also update Identity user
             var appUser = await _userManager.FindByIdAsync(userId);
             if (appUser != null)
             {
-                appUser.DisplayName = dto.DisplayName;
+                appUser.DisplayName = dto.DisplayName.Trim();
+                await _userManager.UpdateAsync(appUser);
+            }
+        }
+
+        public async Task UpdateUserIdentifierAsync(string userId, UpdateUserIdentifier dto)
+        {
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            var normalized = UserIdentifierHelper.NormalizeCandidate(dto.UserIdentifier);
+            if (normalized.Length < 4)
+                throw new BadRequestException("شناسه کاربر معتبر نیست.");
+
+            var uniqueIdentifier = await UserIdentifierHelper.GenerateUniqueAsync(
+                _userManager,
+                normalized,
+                userId);
+
+            if (!string.Equals(uniqueIdentifier, normalized, StringComparison.Ordinal))
+                throw new BadRequestException("این شناسه قبلاً استفاده شده است.");
+
+            user.UserIdentifier = uniqueIdentifier;
+            await _userRepository.UpdateUserAsync(user);
+
+            var appUser = await _userManager.FindByIdAsync(userId);
+            if (appUser != null)
+            {
+                appUser.UserIdentifier = uniqueIdentifier;
                 await _userManager.UpdateAsync(appUser);
             }
         }

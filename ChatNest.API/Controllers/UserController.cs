@@ -158,6 +158,42 @@ namespace ChatNest.API.Controllers
         }
 
         /// <summary>
+        /// شناسه عمومی کاربر را به‌روزرسانی می‌کند.
+        /// </summary>
+        [HttpPatch]
+        public async Task<IActionResult> UserIdentifier([FromBody] UpdateUserIdentifier dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            try
+            {
+                await _userService.UpdateUserIdentifierAsync(UserId, dto);
+                await _notificationHubContext.Clients.All.SendAsync(
+                    "ReceiveRecipientProfiles",
+                    new Dictionary<string, Dictionary<string, object>>
+                    {
+                        { UserId, new Dictionary<string, object> { { "userIdentifier", dto.UserIdentifier } } }
+                    });
+
+                return Ok(new { message = "شناسه کاربر به‌روزرسانی شد." });
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (FirebaseException ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// شماره تلفن کاربر را به‌روزرسانی می‌کند.
         /// شماره تلفن جدید با موفقیت به‌روزرسانی شده و تغییرات به تمام کلاینت‌ها اطلاع داده می‌شود.
         /// </summary>
