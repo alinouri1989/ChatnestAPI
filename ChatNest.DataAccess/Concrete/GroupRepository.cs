@@ -77,8 +77,26 @@ namespace ChatNest.DataAccess.Concrete
             var group = await _context.Groups.FindAsync(groupId);
             if (group != null)
             {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+
+                var linkedCalls = await _context.Calls
+                    .Where(c => c.ChatId == groupId)
+                    .ToListAsync();
+                if (linkedCalls.Count > 0)
+                {
+                    _context.Calls.RemoveRange(linkedCalls);
+                }
+
+                var linkedGroupChat = await _context.Chats
+                    .FirstOrDefaultAsync(c => c.Id == groupId && c.ChatType == "Group");
+                if (linkedGroupChat != null)
+                {
+                    _context.Chats.Remove(linkedGroupChat);
+                }
+
                 _context.Groups.Remove(group);
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return true;
             }
             return false;

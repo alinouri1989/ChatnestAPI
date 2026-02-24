@@ -13,6 +13,13 @@ public class ChatRepository : IChatRepository
         _context = context;
     }
 
+    private IQueryable<Chat> ApplyGroupIntegrityFilter(IQueryable<Chat> query)
+    {
+        // Group chats are expected to share the same Id as a row in Groups.
+        // Hide orphaned group chats defensively if data was modified outside the app.
+        return query.Where(c => c.ChatType != "Group" || _context.Groups.Any(g => g.Id == c.Id));
+    }
+
     public async Task<Chat> AddChatAsync(Chat chat)
     {
         _context.Chats.Add(chat);
@@ -22,7 +29,7 @@ public class ChatRepository : IChatRepository
 
     public async Task<Chat?> GetChatByIdAsync(Guid id)
     {
-        return await _context.Chats
+        return await ApplyGroupIntegrityFilter(_context.Chats)
             .Include(c => c.Messages)
             .Include(c => c.ChatParticipants)
             .FirstOrDefaultAsync(c => c.Id == id);
@@ -30,7 +37,7 @@ public class ChatRepository : IChatRepository
 
     public async Task<List<Chat>> GetChatsByUserIdAsync(string userId)
     {
-        return await _context.Chats
+        return await ApplyGroupIntegrityFilter(_context.Chats)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
             .Include(c => c.Messages)
             .Include(c => c.ChatParticipants)
@@ -39,7 +46,7 @@ public class ChatRepository : IChatRepository
 
     public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId)
     {
-        return await _context.Chats
+        return await ApplyGroupIntegrityFilter(_context.Chats)
             .Include(c => c.Messages)
             .Include(c => c.ChatParticipants)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
