@@ -42,5 +42,12 @@ namespace ChatNest.Services.Abstract
         /// <param name="email">آدرس ایمیل استفاده شده برای درخواست بازنشانی رمز عبور</param>
         /// <returns>یک عملیات ناهمزمان برمی‌گرداند.</returns>
         Task ResetPasswordAsync(string email);
+
+        /// <summary>
+        /// بازنشانی رمز عبور را با استفاده از توکن ارسال‌شده در ایمیل تکمیل می‌کند.
+        /// </summary>
+        /// <param name="dto">DTO حاوی ایمیل، توکن و رمز عبور جدید</param>
+        /// <returns>یک عملیات ناهمزمان برمی‌گرداند.</returns>
+        Task ConfirmResetPasswordAsync(ResetPasswordConfirm dto);
     }
 }

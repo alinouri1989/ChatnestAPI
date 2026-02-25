@@ -233,5 +233,32 @@ namespace ChatNest.API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }
+
+        [HttpPost]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordConfirm dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _authService.ConfirmResetPasswordAsync(dto);
+                return Ok(new { message = "رمز عبور با موفقیت تغییر کرد." });
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (NotFoundException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
     }
 }

@@ -7,7 +7,9 @@ using ChatNest.Services.Exceptions;
 using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using System.Linq;
+using System.Text;
 
 namespace ChatNest.Services.Concrete
 {
@@ -17,6 +19,8 @@ namespace ChatNest.Services.Concrete
         private readonly IAuthRepository _authRepository;
         private readonly UserManager<User> _userManager;
         private readonly IJwtManager _jwtManager;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
         private readonly IMapper _mapper;
 
         public AuthService(
@@ -24,12 +28,16 @@ namespace ChatNest.Services.Concrete
             IUserRepository userRepository,
             UserManager<User> userManager,
             IJwtManager jwtManager,
+            IEmailService emailService,
+            IConfiguration configuration,
             IMapper mapper)
         {
             _authRepository = authRepository;
             _userRepository = userRepository;
             _userManager = userManager;
             _jwtManager = jwtManager;
+            _emailService = emailService;
+            _configuration = configuration;
             _mapper = mapper;
         }
 
@@ -152,11 +160,70 @@ namespace ChatNest.Services.Concrete
             var user = await _userRepository.GetUserByEmailAsync(email);
             if (user != null)
             {
-                await _authRepository.ResetPasswordAsync(email);
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var encodedToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
+
+                var clientBaseUrl = (_configuration["PasswordReset:ClientBaseUrl"] ?? string.Empty).TrimEnd('/');
+                var resetPath = _configuration["PasswordReset:Path"] ?? "/reset-password/confirm";
+                if (!resetPath.StartsWith('/'))
+                {
+                    resetPath = "/" + resetPath;
+                }
+
+                if (string.IsNullOrWhiteSpace(clientBaseUrl))
+                {
+                    throw new InvalidOperationException("Password reset client URL is not configured.");
+                }
+
+                var resetUrl = $"{clientBaseUrl}{resetPath}?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(encodedToken)}";
+
+                var htmlBody = $"""
+                    <div style="font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right;line-height:1.8">
+                        <h2>بازیابی رمز عبور ChatNest</h2>
+                        <p>برای تنظیم رمز عبور جدید، روی دکمه زیر کلیک کنید:</p>
+                        <p>
+                            <a href="{resetUrl}" style="background:#0f6fff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;display:inline-block">
+                                بازیابی رمز عبور
+                            </a>
+                        </p>
+                        <p>اگر شما این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.</p>
+                        <p style="font-size:12px;color:#666">لینک مستقیم: {resetUrl}</p>
+                    </div>
+                    """;
+
+                await _emailService.SendEmailAsync(email, "بازیابی رمز عبور ChatNest", htmlBody);
             }
             else
             {
                 throw new NotFoundException("کاربر یافت نشد.");
+            }
+        }
+
+        public async Task ConfirmResetPasswordAsync(ResetPasswordConfirm dto)
+        {
+            FieldValidationHelper.ValidateEmailFormat(dto.Email);
+
+            var user = await _userRepository.GetUserByEmailAsync(dto.Email);
+            if (user == null)
+            {
+                throw new NotFoundException("کاربر یافت نشد.");
+            }
+
+            string decodedToken;
+            try
+            {
+                decodedToken = Encoding.UTF8.GetString(Convert.FromBase64String(dto.Token));
+            }
+            catch (FormatException)
+            {
+                throw new BadRequestException("توکن بازیابی نامعتبر است.");
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, decodedToken, dto.NewPassword);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new BadRequestException(string.IsNullOrWhiteSpace(errors) ? "بازنشانی رمز عبور انجام نشد." : errors);
             }
         }
     }
