@@ -1,8 +1,12 @@
 using ChatNest.Services.Abstract;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MimeKit;
+using MimeKit.Text;
 using System.Net;
-using System.Net.Mail;
+using System.Net.Sockets;
 
 namespace ChatNest.Services.Concrete
 {
@@ -34,29 +38,146 @@ namespace ChatNest.Services.Concrete
                 string.IsNullOrWhiteSpace(password) ||
                 string.IsNullOrWhiteSpace(fromEmail))
             {
+                _logger.LogError(
+                    "SMTP config invalid. HostConfigured={HostConfigured}, UsernameConfigured={UsernameConfigured}, PasswordConfigured={PasswordConfigured}, FromEmailConfigured={FromEmailConfigured}",
+                    !string.IsNullOrWhiteSpace(host),
+                    !string.IsNullOrWhiteSpace(username),
+                    !string.IsNullOrWhiteSpace(password),
+                    !string.IsNullOrWhiteSpace(fromEmail));
                 throw new InvalidOperationException("SMTP email settings are not configured correctly.");
             }
 
-            using var message = new MailMessage
+            _logger.LogInformation(
+                "SMTP send requested. Host={Host}, Port={Port}, EnableSsl={EnableSsl}, Username={Username}, From={FromEmail}, To={ToEmail}, Subject={Subject}, BodyLength={BodyLength}",
+                host,
+                port,
+                enableSsl,
+                username,
+                fromEmail,
+                toEmail,
+                subject,
+                htmlBody?.Length ?? 0);
+
+            try
             {
-                From = new MailAddress(fromEmail, fromName),
-                Subject = subject,
-                Body = htmlBody,
-                IsBodyHtml = true
+                var addresses = await Dns.GetHostAddressesAsync(host);
+                _logger.LogInformation(
+                    "SMTP host resolved. Host={Host}, Addresses={Addresses}",
+                    host,
+                    string.Join(", ", addresses.Select(a => a.ToString())));
+            }
+            catch (SocketException ex)
+            {
+                _logger.LogWarning(ex, "SMTP host DNS resolution failed. Host={Host}", host);
+            }
+
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(fromName, fromEmail));
+            message.To.Add(MailboxAddress.Parse(toEmail));
+            message.Subject = subject;
+            message.Body = new TextPart(TextFormat.Html)
+            {
+                Text = htmlBody
             };
 
-            message.To.Add(toEmail);
+            var secureSocketOptions = ResolveSecureSocketOptions(port, enableSsl);
 
-            using var smtpClient = new SmtpClient(host, port)
+            using var smtpClient = new SmtpClient
             {
-                EnableSsl = enableSsl,
-                UseDefaultCredentials = false,
-                Credentials = new NetworkCredential(username, password),
-                DeliveryMethod = SmtpDeliveryMethod.Network
+                Timeout = 30000
             };
 
-            await smtpClient.SendMailAsync(message);
-            _logger.LogInformation("Password reset email sent to {Email}", toEmail);
+            try
+            {
+                _logger.LogInformation(
+                    "SMTP client connecting. Host={Host}, Port={Port}, EnableSsl={EnableSsl}, SecureSocketOptions={SecureSocketOptions}",
+                    host,
+                    port,
+                    enableSsl,
+                    secureSocketOptions);
+
+                await smtpClient.ConnectAsync(host, port, secureSocketOptions);
+
+                _logger.LogInformation(
+                    "SMTP connected. IsSecure={IsSecure}, IsAuthenticated={IsAuthenticated}, Capabilities={Capabilities}, AuthenticationMechanisms={AuthenticationMechanisms}",
+                    smtpClient.IsSecure,
+                    smtpClient.IsAuthenticated,
+                    smtpClient.Capabilities,
+                    string.Join(", ", smtpClient.AuthenticationMechanisms));
+
+                _logger.LogInformation("SMTP authenticating. Username={Username}", username);
+                await smtpClient.AuthenticateAsync(username, password);
+
+                _logger.LogInformation(
+                    "SMTP authenticated successfully. IsAuthenticated={IsAuthenticated}, To={ToEmail}",
+                    smtpClient.IsAuthenticated,
+                    toEmail);
+
+                _logger.LogInformation("SMTP sending message. To={ToEmail}, Subject={Subject}", toEmail, subject);
+                await smtpClient.SendAsync(message);
+                _logger.LogInformation("Password reset email sent successfully to {Email}", toEmail);
+
+                await smtpClient.DisconnectAsync(true);
+                _logger.LogInformation("SMTP disconnected cleanly. Host={Host}", host);
+            }
+            catch (MailKit.Net.Smtp.SmtpCommandException ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "SMTP command failed. ErrorCode={ErrorCode}, StatusCode={StatusCode}, Host={Host}, Port={Port}, EnableSsl={EnableSsl}, SecureSocketOptions={SecureSocketOptions}, Username={Username}, From={FromEmail}, To={ToEmail}, InnerError={InnerError}",
+                    ex.ErrorCode,
+                    ex.StatusCode,
+                    host,
+                    port,
+                    enableSsl,
+                    secureSocketOptions,
+                    username,
+                    fromEmail,
+                    toEmail,
+                    ex.InnerException?.Message);
+                throw;
+            }
+            catch (MailKit.Net.Smtp.SmtpProtocolException ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "SMTP protocol failed. Host={Host}, Port={Port}, EnableSsl={EnableSsl}, SecureSocketOptions={SecureSocketOptions}, Username={Username}, To={ToEmail}, InnerError={InnerError}",
+                    host,
+                    port,
+                    enableSsl,
+                    secureSocketOptions,
+                    username,
+                    toEmail,
+                    ex.InnerException?.Message);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Unexpected email send failure. Host={Host}, Port={Port}, EnableSsl={EnableSsl}, SecureSocketOptions={SecureSocketOptions}, To={ToEmail}",
+                    host,
+                    port,
+                    enableSsl,
+                    secureSocketOptions,
+                    toEmail);
+                throw;
+            }
+        }
+
+        private static SecureSocketOptions ResolveSecureSocketOptions(int port, bool enableSsl)
+        {
+            if (!enableSsl)
+            {
+                return SecureSocketOptions.None;
+            }
+
+            return port switch
+            {
+                465 => SecureSocketOptions.SslOnConnect,
+                25 => SecureSocketOptions.StartTlsWhenAvailable,
+                _ => SecureSocketOptions.StartTls
+            };
         }
     }
 }

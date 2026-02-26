@@ -4,6 +4,7 @@ using ChatNest.Shared.DTOs.Request;
 using Firebase.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace ChatNest.API.Controllers
 {
@@ -16,14 +17,16 @@ namespace ChatNest.API.Controllers
     public sealed class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly ILogger<AuthController> _logger;
 
         /// <summary>
         /// یک نمونه جدید از کلاس <see cref="AuthController"/> را ایجاد می‌کند.
         /// </summary>
         /// <param name="authService">وابستگی <see cref="IAuthService"/> برای عملیات احراز هویت کاربر.</param>
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
             _authService = authService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -217,19 +220,24 @@ namespace ChatNest.API.Controllers
         {
             try
             {
+                _logger.LogInformation("Password reset endpoint called for {Email}", email);
                 await _authService.ResetPasswordAsync(email);
+                _logger.LogInformation("Password reset endpoint succeeded for {Email}", email);
                 return Ok(new { message = "لینک بازیابی رمز عبور ارسال شد." });
             }
             catch (NotFoundException ex)
             {
+                _logger.LogWarning(ex, "Password reset endpoint user not found for {Email}", email);
                 return BadRequest(new { message = ex.Message });
             }
             catch (FirebaseAuthHttpException ex)
             {
+                _logger.LogError(ex, "Firebase error in password reset endpoint for {Email}", email);
                 return StatusCode(500, new { message = $"خطایی مرتبط با Firebase رخ داده است!", errorDetails = ex.Message });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Unexpected error in password reset endpoint for {Email}", email);
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
         }

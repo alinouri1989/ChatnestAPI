@@ -8,7 +8,7 @@ using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
-using System.Linq;
+using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace ChatNest.Services.Concrete
@@ -21,6 +21,7 @@ namespace ChatNest.Services.Concrete
         private readonly IJwtManager _jwtManager;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<AuthService> _logger;
         private readonly IMapper _mapper;
 
         public AuthService(
@@ -30,6 +31,7 @@ namespace ChatNest.Services.Concrete
             IJwtManager jwtManager,
             IEmailService emailService,
             IConfiguration configuration,
+            ILogger<AuthService> logger,
             IMapper mapper)
         {
             _authRepository = authRepository;
@@ -38,6 +40,7 @@ namespace ChatNest.Services.Concrete
             _jwtManager = jwtManager;
             _emailService = emailService;
             _configuration = configuration;
+            _logger = logger;
             _mapper = mapper;
         }
 
@@ -84,7 +87,7 @@ namespace ChatNest.Services.Concrete
                 return await Task.Run(() => _jwtManager.GenerateToken(user!.Id));
             }
 
-            throw new BadRequestException("Invalid email or password");
+            throw new BadRequestException("نام کاربری یا کلمه عبور صحیح نمی باشد");
         }
 
         public async Task<string> SignInGoogleAsync(SignInProvider dto)
@@ -155,13 +158,20 @@ namespace ChatNest.Services.Concrete
 
         public async Task ResetPasswordAsync(string email)
         {
+            _logger.LogInformation("ResetPassword requested for {Email}", email);
             FieldValidationHelper.ValidateEmailFormat(email);
 
             var user = await _userRepository.GetUserByEmailAsync(email);
             if (user != null)
             {
+                _logger.LogInformation("ResetPassword user found for {Email}. UserId={UserId}", email, user.Id);
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
                 var encodedToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
+                _logger.LogInformation(
+                    "Password reset token generated for {Email}. RawTokenLength={RawTokenLength}, EncodedTokenLength={EncodedTokenLength}",
+                    email,
+                    token.Length,
+                    encodedToken.Length);
 
                 var clientBaseUrl = (_configuration["PasswordReset:ClientBaseUrl"] ?? string.Empty).TrimEnd('/');
                 var resetPath = _configuration["PasswordReset:Path"] ?? "/reset-password/confirm";
@@ -172,10 +182,17 @@ namespace ChatNest.Services.Concrete
 
                 if (string.IsNullOrWhiteSpace(clientBaseUrl))
                 {
+                    _logger.LogError("Password reset client URL missing. ConfigKey=PasswordReset:ClientBaseUrl");
                     throw new InvalidOperationException("Password reset client URL is not configured.");
                 }
 
                 var resetUrl = $"{clientBaseUrl}{resetPath}?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(encodedToken)}";
+                _logger.LogInformation(
+                    "Password reset link generated for {Email}. ClientBaseUrl={ClientBaseUrl}, ResetPath={ResetPath}, UrlLength={UrlLength}",
+                    email,
+                    clientBaseUrl,
+                    resetPath,
+                    resetUrl.Length);
 
                 var htmlBody = $"""
                     <div style="font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right;line-height:1.8">
@@ -191,10 +208,21 @@ namespace ChatNest.Services.Concrete
                     </div>
                     """;
 
-                await _emailService.SendEmailAsync(email, "بازیابی رمز عبور ChatNest", htmlBody);
+                _logger.LogInformation("Calling email service for password reset. To={Email}", email);
+                try
+                {
+                    await _emailService.SendEmailAsync(email, "بازیابی رمز عبور ChatNest", htmlBody);
+                    _logger.LogInformation("Password reset email flow completed for {Email}", email);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Password reset email flow failed for {Email}", email);
+                    throw;
+                }
             }
             else
             {
+                _logger.LogWarning("ResetPassword requested for unknown email {Email}", email);
                 throw new NotFoundException("کاربر یافت نشد.");
             }
         }
