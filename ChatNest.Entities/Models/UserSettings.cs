@@ -22,5 +22,12 @@ namespace ChatNest.Entities.Models
         public bool LastSeenEnabled { get; set; } = true;
         public bool ProfilePhotoVisible { get; set; } = true;
         public bool GroupInviteEnabled { get; set; } = true;
+
+        // پرسش امنیتی برای بازیابی موقت رمز عبور
+        public string SecurityQuestionKey { get; set; } = string.Empty;
+        public string SecurityQuestionText { get; set; } = string.Empty;
+        public string SecurityQuestionAnswerHash { get; set; } = string.Empty;
+        public bool SecurityQuestionAnswerConfigured { get; set; } = false;
+        public DateTime? SecurityQuestionUpdatedAtUtc { get; set; }
     }
 }

@@ -101,6 +101,13 @@ namespace ChatNest.Services.Abstract
         Task ChangeChatBackgroundAsync(string userId, ChangeChatBackground dto);
 
         /// <summary>
+        /// پرسش امنیتی و پاسخ آن را برای کاربر تنظیم/به‌روزرسانی می‌کند.
+        /// </summary>
+        /// <param name="userId">شناسه کاربر</param>
+        /// <param name="dto">اطلاعات پرسش امنیتی</param>
+        Task UpdateSecurityQuestionAsync(string userId, UpdateSecurityQuestion dto);
+
+        /// <summary>
         /// اطلاعات پروفایل چندین گیرنده را دریافت می‌کند.
         /// </summary>
         /// <param name="recipientIds">شناسه‌های گیرندگان.</param>

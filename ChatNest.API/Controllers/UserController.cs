@@ -302,6 +302,33 @@ namespace ChatNest.API.Controllers
             }
         }
 
+        [HttpPatch]
+        public async Task<IActionResult> SecurityQuestion([FromBody] UpdateSecurityQuestion dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _userService.UpdateSecurityQuestionAsync(UserId, dto);
+                return Ok(new { message = "پرسش امنیتی با موفقیت به‌روزرسانی شد." });
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
         /// <summary>
         /// تنظیمات تم کاربر را به‌روزرسانی می‌کند.
         /// تم جدید با موفقیت به‌روزرسانی می‌شود.

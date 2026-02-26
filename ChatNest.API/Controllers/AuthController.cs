@@ -243,6 +243,65 @@ namespace ChatNest.API.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> PasswordFallbackQuestion([FromBody] PasswordFallbackQuestionRequest dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var question = await _authService.GetPasswordFallbackQuestionAsync(dto.Email);
+                return Ok(question);
+            }
+            catch (NotFoundException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in password fallback question endpoint for {Email}", dto.Email);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> PasswordFallback([FromBody] ResetPasswordFallback dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                _logger.LogWarning("Temporary fallback password reset endpoint called for {Email}", dto.Email);
+                await _authService.ResetPasswordByIdentityAsync(dto);
+                return Ok(new { message = "رمز عبور با موفقیت تغییر کرد." });
+            }
+            catch (BadRequestException ex)
+            {
+                _logger.LogWarning(ex, "Fallback password reset validation failed for {Email}", dto.Email);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (NotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Fallback password reset user not found for {Email}", dto.Email);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in fallback password reset endpoint for {Email}", dto.Email);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        [HttpPost]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordConfirm dto)
         {
             if (!ModelState.IsValid)

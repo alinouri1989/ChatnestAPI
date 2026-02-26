@@ -6,9 +6,11 @@ using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
+using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text;
 
 namespace ChatNest.Services.Concrete
@@ -253,6 +255,140 @@ namespace ChatNest.Services.Concrete
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
                 throw new BadRequestException(string.IsNullOrWhiteSpace(errors) ? "بازنشانی رمز عبور انجام نشد." : errors);
             }
+        }
+
+        public async Task<PasswordSecurityQuestionPrompt> GetPasswordFallbackQuestionAsync(string email)
+        {
+            FieldValidationHelper.ValidateEmailFormat(email);
+
+            var user = await _userRepository.GetUserByEmailAsync(email);
+            if (user == null)
+            {
+                throw new NotFoundException("کاربر یافت نشد.");
+            }
+
+            await EnsureSecurityQuestionDefaultsAsync(user);
+
+            var settings = user.UserSettings;
+            return new PasswordSecurityQuestionPrompt
+            {
+                QuestionKey = settings.SecurityQuestionKey,
+                QuestionText = settings.SecurityQuestionText,
+                HasAnswerConfigured = settings.SecurityQuestionAnswerConfigured
+            };
+        }
+
+        public async Task ResetPasswordByIdentityAsync(ResetPasswordFallback dto)
+        {
+            _logger.LogWarning("Temporary fallback password reset with security question requested for {Email}", dto.Email);
+            FieldValidationHelper.ValidateEmailFormat(dto.Email);
+
+            var user = await _userRepository.GetUserByEmailAsync(dto.Email);
+            if (user == null)
+            {
+                _logger.LogWarning("Fallback reset requested for unknown email {Email}", dto.Email);
+                throw new NotFoundException("کاربر یافت نشد.");
+            }
+
+            await EnsureSecurityQuestionDefaultsAsync(user);
+
+            var settings = user.UserSettings;
+            if (!settings.SecurityQuestionAnswerConfigured)
+            {
+                _logger.LogWarning(
+                    "Fallback reset denied because security answer is not configured for {Email}. QuestionKey={QuestionKey}",
+                    dto.Email,
+                    settings.SecurityQuestionKey);
+                throw new BadRequestException("برای این حساب هنوز پاسخ پرسش امنیتی ثبت نشده است. لطفاً پس از ورود به حساب، آن را تنظیم کنید.");
+            }
+
+            var requestedQuestionKey = SecurityQuestionHelper.NormalizeKey(dto.QuestionKey);
+            var storedQuestionKey = SecurityQuestionHelper.NormalizeKey(settings.SecurityQuestionKey);
+            if (!string.Equals(requestedQuestionKey, storedQuestionKey, StringComparison.Ordinal))
+            {
+                _logger.LogWarning(
+                    "Fallback reset question key mismatch for {Email}. Requested={RequestedKey}, Stored={StoredKey}",
+                    dto.Email,
+                    requestedQuestionKey,
+                    storedQuestionKey);
+                throw new BadRequestException("پرسش امنیتی انتخاب‌شده با حساب کاربری مطابقت ندارد.");
+            }
+
+            if (!SecurityQuestionHelper.VerifyAnswer(dto.Answer, settings.SecurityQuestionAnswerHash))
+            {
+                _logger.LogWarning("Fallback reset security answer mismatch for {Email}", dto.Email);
+                throw new BadRequestException("پاسخ پرسش امنیتی صحیح نیست.");
+            }
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, token, dto.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogWarning("Fallback reset failed for {Email}: {Errors}", dto.Email, errors);
+                throw new BadRequestException(string.IsNullOrWhiteSpace(errors) ? "بازنشانی رمز عبور انجام نشد." : errors);
+            }
+
+            _logger.LogWarning("Temporary fallback password reset succeeded for {Email}", dto.Email);
+        }
+
+        private async Task EnsureSecurityQuestionDefaultsAsync(User user)
+        {
+            var settings = user.UserSettings;
+            var changed = false;
+
+            if (string.IsNullOrWhiteSpace(settings.SecurityQuestionKey) || !SecurityQuestionHelper.IsKnownKey(settings.SecurityQuestionKey))
+            {
+                var defaultKey = SecurityQuestionHelper.GetDefaultQuestionKey(user.Id);
+                settings.SecurityQuestionKey = defaultKey;
+                settings.SecurityQuestionText = SecurityQuestionHelper.ResolveQuestionText(defaultKey, null);
+                changed = true;
+            }
+            else if (string.IsNullOrWhiteSpace(settings.SecurityQuestionText))
+            {
+                settings.SecurityQuestionText = SecurityQuestionHelper.ResolveQuestionText(settings.SecurityQuestionKey, null);
+                changed = true;
+            }
+
+            var computedConfigured = !string.IsNullOrWhiteSpace(settings.SecurityQuestionAnswerHash);
+            if (settings.SecurityQuestionAnswerConfigured != computedConfigured)
+            {
+                settings.SecurityQuestionAnswerConfigured = computedConfigured;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                user.UserSettings = settings;
+                await _userRepository.UpdateUserAsync(user);
+            }
+        }
+
+        private static bool IsBirthDateMatch(string? storedBirthDate, DateTime providedBirthDate)
+        {
+            if (string.IsNullOrWhiteSpace(storedBirthDate))
+            {
+                return false;
+            }
+
+            if (DateTime.TryParse(storedBirthDate, out var parsedStored))
+            {
+                return parsedStored.Date == providedBirthDate.Date;
+            }
+
+            var candidates = new[]
+            {
+                providedBirthDate.ToShortDateString(),
+                providedBirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                providedBirthDate.ToString("M/d/yyyy", CultureInfo.InvariantCulture),
+                providedBirthDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture),
+                providedBirthDate.ToString("d/M/yyyy", CultureInfo.InvariantCulture),
+                providedBirthDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+            };
+
+            return candidates.Any(candidate =>
+                string.Equals(candidate, storedBirthDate.Trim(), StringComparison.OrdinalIgnoreCase));
         }
     }
 }

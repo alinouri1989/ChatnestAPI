@@ -7,6 +7,7 @@ using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Identity;
+using System.Text.Json;
 
 namespace ChatNest.Services.Concrete
 {
@@ -65,7 +66,11 @@ namespace ChatNest.Services.Concrete
                 }
             }
 
-            return _mapper.Map<UserInfo>(user);
+            await EnsureSecurityQuestionDefaultsAsync(user);
+
+            var userInfo = _mapper.Map<UserInfo>(user);
+            userInfo.UserSettings = CreatePublicUserSettings(user.UserSettings);
+            return userInfo;
         }
 
         public async Task<Dictionary<string, CallerUser>> GetUserProfilesAsync(List<string> recipientIds)
@@ -264,6 +269,38 @@ namespace ChatNest.Services.Concrete
             await _userRepository.UpdateUserAsync(user);
         }
 
+        public async Task UpdateSecurityQuestionAsync(string userId, UpdateSecurityQuestion dto)
+        {
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            var settings = user.UserSettings;
+            var normalizedKey = SecurityQuestionHelper.NormalizeKey(dto.QuestionKey);
+
+            if (!SecurityQuestionHelper.IsKnownKey(normalizedKey))
+                throw new BadRequestException("سؤال امنیتی انتخاب‌شده معتبر نیست.");
+
+            string questionText;
+            try
+            {
+                questionText = SecurityQuestionHelper.ResolveQuestionText(normalizedKey, dto.CustomQuestionText);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new BadRequestException(ex.Message);
+            }
+
+            settings.SecurityQuestionKey = normalizedKey;
+            settings.SecurityQuestionText = questionText;
+            settings.SecurityQuestionAnswerHash = SecurityQuestionHelper.HashAnswer(dto.Answer);
+            settings.SecurityQuestionAnswerConfigured = !string.IsNullOrWhiteSpace(settings.SecurityQuestionAnswerHash);
+            settings.SecurityQuestionUpdatedAtUtc = DateTime.UtcNow;
+            user.UserSettings = settings;
+
+            await _userRepository.UpdateUserAsync(user);
+        }
+
         public async Task<Dictionary<string, RecipientProfile>> GetRecipientProfilesAsync(List<string> recipientIds)
         {
             var result = new Dictionary<string, RecipientProfile>();
@@ -291,6 +328,46 @@ namespace ChatNest.Services.Concrete
                 appUser.LastConnectionDate = lastConnectionDate;
                 await _userManager.UpdateAsync(appUser);
             }
+        }
+
+        private async Task EnsureSecurityQuestionDefaultsAsync(User user)
+        {
+            var userSettings = user.UserSettings;
+            var changed = false;
+
+            if (string.IsNullOrWhiteSpace(userSettings.SecurityQuestionKey) || !SecurityQuestionHelper.IsKnownKey(userSettings.SecurityQuestionKey))
+            {
+                var defaultKey = SecurityQuestionHelper.GetDefaultQuestionKey(user.Id);
+                userSettings.SecurityQuestionKey = defaultKey;
+                userSettings.SecurityQuestionText = SecurityQuestionHelper.ResolveQuestionText(defaultKey, null);
+                changed = true;
+            }
+            else if (string.IsNullOrWhiteSpace(userSettings.SecurityQuestionText))
+            {
+                userSettings.SecurityQuestionText = SecurityQuestionHelper.ResolveQuestionText(userSettings.SecurityQuestionKey, null);
+                changed = true;
+            }
+
+            var computedConfigured = !string.IsNullOrWhiteSpace(userSettings.SecurityQuestionAnswerHash);
+            if (userSettings.SecurityQuestionAnswerConfigured != computedConfigured)
+            {
+                userSettings.SecurityQuestionAnswerConfigured = computedConfigured;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                user.UserSettings = userSettings;
+                await _userRepository.UpdateUserAsync(user);
+            }
+        }
+
+        private static UserSettings CreatePublicUserSettings(UserSettings settings)
+        {
+            var clone = JsonSerializer.Deserialize<UserSettings>(JsonSerializer.Serialize(settings)) ?? new UserSettings();
+            clone.SecurityQuestionAnswerConfigured = !string.IsNullOrWhiteSpace(settings.SecurityQuestionAnswerHash) || settings.SecurityQuestionAnswerConfigured;
+            clone.SecurityQuestionAnswerHash = string.Empty;
+            return clone;
         }
     }
 }
