@@ -35,23 +35,33 @@ public class ChatRepository : IChatRepository
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
-    public async Task<List<Chat>> GetChatsByUserIdAsync(string userId)
+    public async Task<List<Chat>> GetChatsByUserIdAsync(string userId, int skip = 0, int take = 5)
     {
         return await ApplyGroupIntegrityFilter(_context.Chats)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
             .Include(c => c.Messages)
             .Include(c => c.ChatParticipants)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId)
+    public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId, int skip = 0, int take = 5)
     {
         return await ApplyGroupIntegrityFilter(_context.Chats)
             .Include(c => c.Messages)
             .Include(c => c.ChatParticipants)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
             .OrderByDescending(c => c.CreatedDate)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync();
+    }
+    public async Task<int> GetUserChatsCountAsync(string userId)
+    {
+        return await ApplyGroupIntegrityFilter(_context.Chats)
+                        .Include(c => c.ChatParticipants)
+                        .CountAsync(c => c.ChatParticipants.Any(cp => cp.UserId == userId));
     }
 
     public async Task<Chat> UpdateChatAsync(Chat chat)

@@ -71,7 +71,7 @@ namespace ChatNest.DataAccess.Concrete
                 .FirstOrDefaultAsync(m => m.Id == messageId);
         }
 
-        public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 50)
+        public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5)
         {
             return await _context.Messages
                 .Where(m => m.ChatId == chatId)

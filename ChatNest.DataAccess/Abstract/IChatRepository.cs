@@ -4,8 +4,9 @@ public interface IChatRepository
 {
     Task<Chat> AddChatAsync(Chat chat);
     Task<Chat?> GetChatByIdAsync(Guid id);
-    Task<List<Chat>> GetChatsByUserIdAsync(string userId);
-    Task<IEnumerable<Chat>> GetUserChatsAsync(string userId);
+    Task<int> GetUserChatsCountAsync(string userId);
+    Task<List<Chat>> GetChatsByUserIdAsync(string userId, int skip = 0, int take = 5);
+    Task<IEnumerable<Chat>> GetUserChatsAsync(string userId, int skip = 0, int take = 5);
     Task<Chat> UpdateChatAsync(Chat chat);
     Task DeleteChatAsync(Guid id);
     Task AddParticipantAsync(Guid chatId, string userId);

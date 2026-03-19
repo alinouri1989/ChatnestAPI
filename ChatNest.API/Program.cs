@@ -182,8 +182,8 @@ try
                     {
                         // File/image messages are currently sent as Base64 through the hub.
                         // Default SignalR limit (~32KB) closes the connection for upload payloads.
-                        // 300MB covers the existing 200MB file limit plus Base64 overhead.
-                        options.MaximumReceiveMessageSize = 300L * 1024 * 1024;
+                        // +700MB covers the existing 700MB file limit plus Base64 overhead.
+                        options.MaximumReceiveMessageSize = 700L * 1024 * 1024;
                     })
                     .AddJsonProtocol(options =>
                     {

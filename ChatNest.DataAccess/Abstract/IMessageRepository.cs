@@ -8,7 +8,7 @@ namespace ChatNest.DataAccess.Abstract
         Task UpdateMessageDeletedForAsync(Guid messageId, Dictionary<string, DateTime> deletedFor);
         Task UpdateMessageStatusAsync(Guid messageId, string fieldName, Dictionary<string, DateTime> fieldData);
         Task<Message?> GetMessageByIdAsync(Guid messageId);
-        Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 50);
+        Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5);
         Task UpdateMessageAsync(Message message);
         Task<bool> DeleteMessageAsync(Guid messageId);
         Task<IEnumerable<Message>> SearchMessagesAsync(string searchTerm, Guid? chatId = null);

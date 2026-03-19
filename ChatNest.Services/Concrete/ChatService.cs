@@ -2,6 +2,7 @@
 using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Exceptions;
+using ChatNest.Shared.DTOs;
 
 namespace ChatNest.Services.Concrete
 {
@@ -27,7 +28,7 @@ namespace ChatNest.Services.Concrete
             _mapper = mapper;
         }
 
-        public async Task<Dictionary<string, Chat>> CreateChatAsync(string userId, string chatType, string recipientId)
+        public async Task<Dictionary<string, ChatDto>> CreateChatAsync(string userId, string chatType, string recipientId)
         {
             List<string> participants;
             Guid? linkedGroupId = null;
@@ -49,7 +50,7 @@ namespace ChatNest.Services.Concrete
                 var existingGroupChat = await _chatRepository.GetChatByIdAsync(groupId);
                 if (existingGroupChat != null && existingGroupChat.ChatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new Dictionary<string, Chat> { { existingGroupChat.Id.ToString(), existingGroupChat } };
+                    return new Dictionary<string, ChatDto> { { existingGroupChat.Id.ToString(), _mapper.Map<ChatDto>(existingGroupChat) } };
                 }
             }
             else
@@ -75,7 +76,7 @@ namespace ChatNest.Services.Concrete
                 var existingChat = await _chatRepository.GetChatByParticipantsAsync(participants);
                 if (existingChat != null && existingChat.ChatType.Equals("Individual", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new Dictionary<string, Chat> { { existingChat.Id.ToString(), existingChat } };
+                    return new Dictionary<string, ChatDto> { { existingChat.Id.ToString(), _mapper.Map<ChatDto>(existingChat) } };
                 }
             }
 
@@ -99,16 +100,20 @@ namespace ChatNest.Services.Concrete
             // Reload chat with participants
             var createdChat = await _chatRepository.GetChatByIdAsync(chat.Id);
 
-            return new Dictionary<string, Chat> { { chat.Id.ToString(), createdChat } };
+            return new Dictionary<string, ChatDto> { { chat.Id.ToString(), _mapper.Map<ChatDto>(createdChat) } };
+        }
+        public async Task<int> GetUserChatsCountAsync(string userId)
+        {
+            return await _chatRepository.GetUserChatsCountAsync(userId);
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Chat>>, List<string>, List<string>)> GetAllChatsAsync(string userId)
+        public async Task<(Dictionary<string, Dictionary<string, ChatDto>>, List<string>, List<string>)> GetAllChatsAsync(string userId, int skip = 0, int take = 5)
         {
             try
             {
-                var userChats = await _chatRepository.GetUserChatsAsync(userId);
+                var userChats = await _chatRepository.GetUserChatsAsync(userId, skip, take);
                 var userGroups = await _groupRepository.GetUserGroupsAsync(userId);
-                var result = new Dictionary<string, Dictionary<string, Chat>>();
+                var result = new Dictionary<string, Dictionary<string, ChatDto>>();
                 var individualParticipants = new List<string>();
                 var userGroupIds = userGroups.Select(g => g.Id.ToString()).Distinct().ToList();
 
@@ -119,10 +124,10 @@ namespace ChatNest.Services.Concrete
                 }
 
                 var individualChats = userChats.Where(c => c.ChatType == "Individual")
-                                             .ToDictionary(c => c.Id.ToString(), c => c);
+                                             .ToDictionary(c => c.Id.ToString(), c => _mapper.Map<ChatDto>(c));
 
                 var groupChats = userChats.Where(c => c.ChatType == "Group")
-                                         .ToDictionary(c => c.Id.ToString(), c => c);
+                                         .ToDictionary(c => c.Id.ToString(), c => _mapper.Map<ChatDto>(c));
 
                 // Always add the keys, even if empty
                 if (individualChats.Any())
@@ -151,7 +156,7 @@ namespace ChatNest.Services.Concrete
                 else
                 {
                     // Add empty Individual section
-                    result.Add("Individual", new Dictionary<string, Chat>());
+                    result.Add("Individual", new Dictionary<string, ChatDto>());
                 }
 
                 if (groupChats.Any())
@@ -161,7 +166,7 @@ namespace ChatNest.Services.Concrete
                 else
                 {
                     // Add empty Group section
-                    result.Add("Group", new Dictionary<string, Chat>());
+                    result.Add("Group", new Dictionary<string, ChatDto>());
                 }
 
                 return (result, individualParticipants, userGroupIds);
@@ -171,17 +176,17 @@ namespace ChatNest.Services.Concrete
                 // Log the exception and return empty but valid structure
                 Console.WriteLine($"Error in GetAllChatsAsync: {ex.Message}");
 
-                var emptyResult = new Dictionary<string, Dictionary<string, Chat>>
-        {
-            { "Individual", new Dictionary<string, Chat>() },
-            { "Group", new Dictionary<string, Chat>() }
-        };
+                var emptyResult = new Dictionary<string, Dictionary<string, ChatDto>>
+                    {
+                        { "Individual", new Dictionary<string, ChatDto>() },
+                        { "Group", new Dictionary<string, ChatDto>() }
+                    };
 
                 return (emptyResult, new List<string>(), new List<string>());
             }
         }
 
-        public async Task<Dictionary<string, Dictionary<string, Chat>>> ClearChatAsync(string userId, string chatType, string chatId)
+        public async Task<Dictionary<string, Dictionary<string, ChatDto>>> ClearChatAsync(string userId, string chatType, string chatId)
         {
             var chatGuid = Guid.Parse(chatId);
             var chat = await _chatRepository.GetChatByIdAsync(chatGuid);
@@ -202,9 +207,9 @@ namespace ChatNest.Services.Concrete
             }
 
             var updatedChat = await _chatRepository.GetChatByIdAsync(chatGuid);
-            var result = new Dictionary<string, Dictionary<string, Chat>>
+            var result = new Dictionary<string, Dictionary<string, ChatDto>>
             {
-                { chatType, new Dictionary<string, Chat> { { chatId, updatedChat! } } }
+                { chatType, new Dictionary<string, ChatDto> { { chatId, _mapper.Map<ChatDto>(updatedChat!) } } }
             };
 
             return result;

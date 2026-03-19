@@ -1,6 +1,7 @@
-﻿using ChatNest.Entities.Models;
+﻿using AutoMapper;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
+using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -19,7 +20,7 @@ namespace ChatNest.API.Hubs
         private readonly IGroupService _groupService;
         private readonly IChatService _chatService;
         private readonly IUserService _userService;
-
+        private readonly IMapper _mapper;
         /// <summary>
         /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
         /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
@@ -50,12 +51,13 @@ namespace ChatNest.API.Hubs
         /// <param name="groupService">وابستگی <see cref="IGroupService"/> برای عملیات گروه.</param>
         /// <param name="chatService">وابستگی <see cref="IChatService"/> برای عملیات گفتگو.</param>
         /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
-        public ChatHub(IMessageService messageService, IGroupService groupService, IChatService chatService, IUserService userService)
+        public ChatHub(IMessageService messageService, IGroupService groupService, IChatService chatService, IUserService userService, IMapper mapper)
         {
             _messageService = messageService;
             _groupService = groupService;
             _chatService = chatService;
             _userService = userService;
+            _mapper = mapper;
         }
 
         /// <summary>
@@ -103,11 +105,11 @@ namespace ChatNest.API.Hubs
         /// </summary>
         /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
-        public async Task Initial()
+        public async Task Initial(int skip = 0, int take = 5)
         {
             try
             {
-                var (chats, chatsRecipientIds, userGroupIds) = await _chatService.GetAllChatsAsync(UserId);
+                var (chats, chatsRecipientIds, userGroupIds) = await _chatService.GetAllChatsAsync(UserId, skip, take);
 
                 // Ensure we always send valid data
                 var safeChats = chats ?? CreateEmptyChatsStructure();
@@ -130,12 +132,32 @@ namespace ChatNest.API.Hubs
             }
         }
 
-        private Dictionary<string, Dictionary<string, Chat>> CreateEmptyChatsStructure()
+        /// <summary>
+        /// دریافت مجموع چت های کاربر
+        /// </summary>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
+        public async Task TotalChatList()
         {
-            return new Dictionary<string, Dictionary<string, Chat>>
+            try
+            {
+                var totalChats = await _chatService.GetUserChatsCountAsync(UserId);
+
+                await Clients.Caller.SendAsync("ReceiveTotalChats", totalChats);
+            }
+            catch (Exception ex)
+            {
+                await SendEmptyDataToClient();
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        private Dictionary<string, Dictionary<string, ChatDto>> CreateEmptyChatsStructure()
+        {
+            return new Dictionary<string, Dictionary<string, ChatDto>>
                 {
-                    { "Individual", new Dictionary<string, Chat>() },
-                    { "Group", new Dictionary<string, Chat>() }
+                    { "Individual", new Dictionary<string, ChatDto>() },
+                    { "Group", new Dictionary<string, ChatDto>() }
                 };
         }
 
@@ -175,7 +197,7 @@ namespace ChatNest.API.Hubs
             var emptyRecipientProfiles = new Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>();
             var emptyGroupProfiles = new Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>();
 
-            await Clients.Caller.SendAsync("ReceiveInitialChats", emptyChats);
+            await Clients.Caller.SendAsync("ReceiveInitialChats", _mapper.Map<ChatDto>(emptyChats));
             await Clients.Caller.SendAsync("ReceiveInitialGroupProfiles", emptyGroupProfiles);
             await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", emptyRecipientProfiles);
         }
@@ -204,7 +226,7 @@ namespace ChatNest.API.Hubs
                         var chatParticipants = await _chatService.GetChatParticipantsAsync(chatEntity.Id.ToString());
 
                         // Send chat to all participants
-                        var chatResponse = new Dictionary<string, Dictionary<string, Chat>> { { "Individual", chat } };
+                        var chatResponse = new Dictionary<string, Dictionary<string, ChatDto>> { { "Individual", chat } };
                         foreach (var participant in chatParticipants)
                         {
                             await Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);
@@ -232,7 +254,7 @@ namespace ChatNest.API.Hubs
                     // For group chats, recipientId would be the groupId
                     var groupParticipants = await _groupService.GetGroupParticipantsAsync(UserId, recipientId);
 
-                    var chatResponse = new Dictionary<string, Dictionary<string, Chat>> { { "Group", chat } };
+                    var chatResponse = new Dictionary<string, Dictionary<string, ChatDto>> { { "Group", chat } };
                     foreach (var participant in groupParticipants)
                     {
                         await Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);

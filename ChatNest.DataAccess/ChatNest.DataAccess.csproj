@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ChatNest.Entities\ChatNest.Entities.csproj" />
+    <ProjectReference Include="..\ChatNest.Shared\ChatNest.Shared.csproj" />
   </ItemGroup>
 
 </Project>

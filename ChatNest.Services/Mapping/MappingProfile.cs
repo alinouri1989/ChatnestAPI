@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
+using ChatNest.Entities.Identity;
 using ChatNest.Entities.Models;
 using ChatNest.Shared;
+using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
 
@@ -66,6 +68,13 @@ namespace ChatNest.Services.Mapping
 
             // User => CallerUser
             CreateMap<User, CallerUser>();
+
+            CreateMap<User, UserDto>().ReverseMap();
+            CreateMap<Chat, ChatDto>().ReverseMap();
+            CreateMap<ChatParticipant, ChatParticipantDto>().ReverseMap();
+            CreateMap<Group, GroupDto>().ReverseMap();
+            CreateMap<Message, MessageDto>().ReverseMap();
+            CreateMap<RefreshToken, RefreshTokenDto>().ReverseMap();
 
             CreateMap<Group, GroupProfile>()
                 .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id.ToString()))
