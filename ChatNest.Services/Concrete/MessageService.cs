@@ -179,5 +179,13 @@ namespace ChatNest.Services.Concrete
 
             return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
         }
+
+        public async Task<int> GetTotalMessageCountAsync(Guid chatId)
+        {
+            return await _messageRepository.GetTotalMessageCountAsync(chatId);
+        }
+
+        public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5) =>
+                       await _messageRepository.GetChatMessagesAsync(chatId, skip, take);
     }
 }

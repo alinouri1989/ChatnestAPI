@@ -10,6 +10,7 @@ namespace ChatNest.DataAccess.Abstract
         Task<Message?> GetMessageByIdAsync(Guid messageId);
         Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5);
         Task UpdateMessageAsync(Message message);
+        Task<int> GetTotalMessageCountAsync(Guid chatId);
         Task<bool> DeleteMessageAsync(Guid messageId);
         Task<IEnumerable<Message>> SearchMessagesAsync(string searchTerm, Guid? chatId = null);
     }

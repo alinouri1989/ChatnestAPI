@@ -152,6 +152,50 @@ namespace ChatNest.API.Hubs
             }
         }
 
+        /// <summary>
+        /// دریافت مجموع پیام های چت کاربر
+        /// </summary>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
+        public async Task GetTotalMessageCountAsync(string chatId)
+        {
+            try
+            {
+                var _chatId = Guid.Parse(chatId);
+                var totalChatMessages = await _messageService.GetTotalMessageCountAsync(_chatId);
+
+                await Clients.Caller.SendAsync("ReceiveTotalChatMessages", totalChatMessages);
+            }
+            catch (Exception ex)
+            {
+                await SendEmptyDataToClient();
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// دریافت پیام های چت کاربر
+        /// </summary>
+        /// <returns>یک شیء <see cref="Task"/> که عملیات ناهمزمان را نمایندگی می‌کند.</returns>
+        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
+        public async Task GetChatMessagesAsync(string chatId, int skip = 0, int take = 5)
+        {
+            try
+            {
+                var _chatId = Guid.Parse(chatId);
+                var total = await _messageService.GetTotalMessageCountAsync(_chatId);
+                var msgs = await _messageService.GetChatMessagesAsync(_chatId, skip, take);
+
+                var response = new ChatMessagesResponse(total, msgs);
+                await Clients.Caller.SendAsync("ReceiveChatMessages", response);
+            }
+            catch (Exception ex)
+            {
+                await SendEmptyDataToClient();
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
         private Dictionary<string, Dictionary<string, ChatDto>> CreateEmptyChatsStructure()
         {
             return new Dictionary<string, Dictionary<string, ChatDto>>

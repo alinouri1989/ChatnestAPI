@@ -82,6 +82,12 @@ namespace ChatNest.DataAccess.Concrete
                 .ToListAsync();
         }
 
+        public async Task<int> GetTotalMessageCountAsync(Guid chatId)
+        {
+            return await _context.Messages
+                .CountAsync(m => m.ChatId == chatId);
+        }
+
         public async Task UpdateMessageAsync(Message message)
         {
             _context.Messages.Update(message);

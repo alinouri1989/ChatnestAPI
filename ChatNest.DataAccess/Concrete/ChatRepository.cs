@@ -49,7 +49,7 @@ public class ChatRepository : IChatRepository
     public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId, int skip = 0, int take = 5)
     {
         return await ApplyGroupIntegrityFilter(_context.Chats)
-            .Include(c => c.Messages)
+            .Include(c => c.Messages.OrderByDescending(c => c.CreatedDate).Skip(0).Take(10))
             .Include(c => c.ChatParticipants)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
             .OrderByDescending(c => c.CreatedDate)

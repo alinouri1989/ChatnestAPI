@@ -39,5 +39,21 @@ namespace ChatNest.Services.Abstract
         /// <param name="fieldName">کدام فیلد (خوانده شده، تحویل داده شده و غیره) باید به‌روزرسانی شود.</param>
         /// <returns>دیکشنری همراه با اطلاعات به‌روزرسانی شده گفتگو برمی‌گرداند.</returns>
         Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(string userId, string chatType, string chatId, string messageId, string fieldName);
+
+        /// <summary>
+        /// برگرداندن تعداد پیام ها
+        /// </summary>
+        /// <param name="chatId"></param>
+        /// <returns></returns>
+        Task<int> GetTotalMessageCountAsync(Guid chatId);
+
+        /// <summary>
+        /// دریافت پیام های یک گفتگو بر اساس صفحه بندی
+        /// </summary>
+        /// <param name="chatId"></param>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
+        Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5);
     }
 }
