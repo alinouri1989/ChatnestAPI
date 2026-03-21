@@ -19,6 +19,7 @@ using Serilog;
 using Serilog.Events;
 using System.Text;
 using System.Text.Json.Serialization;
+using Xabe.FFmpeg;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -28,6 +29,7 @@ Log.Logger = new LoggerConfiguration()
         retainedFileCountLimit: 14,
         shared: true)
     .CreateBootstrapLogger();
+FFmpeg.SetExecutablesPath(@"C:\Program Files\ffmpeg\bin\");
 
 try
 {

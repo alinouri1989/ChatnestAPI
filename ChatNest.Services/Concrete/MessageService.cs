@@ -69,30 +69,32 @@ namespace ChatNest.Services.Concrete
             if (dto.ContentType != MessageContent.Text && dto.File != null)
             {
                 using var fileStream = new MemoryStream(dto.File);
-                Uri fileUrl;
+                Uri? mediaUrl = null;
+                Uri? thumbUrl = null;
                 long fileSize = dto.File.Length;
 
                 switch (dto.ContentType)
                 {
                     case MessageContent.Image:
-                        fileUrl = await _mediaStorageRepository.UploadPhotoAsync($"message_{message.Id}", "messages", "message,image", fileStream, dto.FileName);
+                        mediaUrl = await _mediaStorageRepository.UploadPhotoAsync($"message_{message.Id}", "messages", "message,image", fileStream, dto.FileName);
                         break;
                     case MessageContent.Video:
-                        fileUrl = await _mediaStorageRepository.UploadVideoAsync($"message_{message.Id}", "messages", "message,video", fileStream, dto.FileName);
+                        (mediaUrl, thumbUrl) = await _mediaStorageRepository.UploadVideoWithThumbnailAsync($"message_{message.Id}", "messages", "message,video", fileStream, dto.FileName);
                         break;
                     case MessageContent.Audio:
-                        fileUrl = await _mediaStorageRepository.UploadAudioAsync($"message_{message.Id}", "messages", "message,audio", fileStream, dto.FileName);
+                        mediaUrl = await _mediaStorageRepository.UploadAudioAsync($"message_{message.Id}", "messages", "message,audio", fileStream, dto.FileName);
                         break;
                     case MessageContent.File:
                         var (url, size) = await _mediaStorageRepository.UploadFileAsync($"message_{message.Id}", "messages", "message,file", fileStream, dto.FileName);
-                        fileUrl = url;
+                        mediaUrl = url;
                         fileSize = size;
                         break;
                     default:
                         throw new BadRequestException("Invalid message type");
                 }
 
-                message.Content = fileUrl.ToString();
+                message.Content = mediaUrl!.ToString();
+                message.ThumbnailUrl = thumbUrl!.ToString();
                 message.FileName = dto.FileName;
                 message.FileSize = fileSize;
             }

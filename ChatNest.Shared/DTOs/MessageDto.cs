@@ -10,6 +10,7 @@ namespace ChatNest.Shared.DTOs
         public Guid Id { get; set; }
 
         public string Content { get; set; } = string.Empty;
+        public string ThumbnailUrl { get; set; } = string.Empty;
 
         public string? FileName { get; set; }
 

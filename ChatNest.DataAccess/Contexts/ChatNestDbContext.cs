@@ -124,6 +124,7 @@ namespace ChatNest.DataAccess.Contexts
                 entity.ToTable("Messages");
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Content).IsRequired();
+                entity.Property(e => e.ThumbnailUrl);
                 entity.Property(e => e.FileName).HasMaxLength(255);
                 entity.Property(e => e.SenderId).IsRequired();
                 entity.Property(e => e.StatusJson).HasColumnType("nvarchar(max)");

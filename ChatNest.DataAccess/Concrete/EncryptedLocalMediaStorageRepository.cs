@@ -1,13 +1,16 @@
-using ChatNest.DataAccess.Abstract;
+﻿using ChatNest.DataAccess.Abstract;
 using ChatNest.DataAccess.Configurations;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Xabe.FFmpeg;
 
 namespace ChatNest.DataAccess.Concrete;
 
 public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageRepository
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     private readonly FileStorageConfig _fileStorageConfig;
 
     public EncryptedLocalMediaStorageRepository(FileStorageConfig fileStorageConfig)
@@ -16,66 +19,120 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
         Directory.CreateDirectory(_fileStorageConfig.RootPath);
     }
 
-    public Task<Uri> UploadPhotoAsync(string publicId, string folder, string tags, MemoryStream photo, string? originalFileName = null) =>
+    #region ----------- Public Upload APIs ---------------------------------
+
+    public Task<Uri> UploadPhotoAsync(string publicId,
+                                      string folder,
+                                      string tags,
+                                      MemoryStream photo,
+                                      string? originalFileName = null) =>
         UploadBinaryAsync(publicId, folder, photo, "image/jpeg", originalFileName);
 
-    public Task<Uri> UploadVideoAsync(string publicId, string folder, string tags, MemoryStream video, string? originalFileName = null) =>
+    public Task<Uri> UploadVideoAsync(string publicId,
+                                      string folder,
+                                      string tags,
+                                      MemoryStream video,
+                                      string? originalFileName = null) =>
         UploadBinaryAsync(publicId, folder, video, "video/mp4", originalFileName);
 
-    public Task<Uri> UploadAudioAsync(string publicId, string folder, string tags, MemoryStream audio, string? originalFileName = null) =>
+    public Task<Uri> UploadAudioAsync(string publicId,
+                                      string folder,
+                                      string tags,
+                                      MemoryStream audio,
+                                      string? originalFileName = null) =>
         UploadBinaryAsync(publicId, folder, audio, "audio/mpeg", originalFileName);
 
-    public async Task<(Uri Url, long Size)> UploadFileAsync(string publicId, string folder, string tags, MemoryStream file, string? originalFileName = null)
+    public async Task<(Uri Url, long Size)> UploadFileAsync(string publicId,
+                                                            string folder,
+                                                            string tags,
+                                                            MemoryStream file,
+                                                            string? originalFileName = null)
     {
         var bytes = file.ToArray();
-        await PersistEncryptedAsync(publicId, folder, bytes, originalFileName, "application/octet-stream");
-        return (BuildPublicUri(folder, publicId), bytes.LongLength);
+        var uri = await PersistEncryptedAsync(publicId,
+                                               folder,
+                                               bytes,
+                                               originalFileName,
+                                               "application/octet-stream");
+        return (uri.Item1, bytes.LongLength);
     }
 
-    public async Task<StoredMediaFile?> GetFileAsync(string folder, string publicId)
+    /// <summary>
+    /// آپلود ویدیو به همراه ساخت thumbnail.
+    /// مسیر thumbnail داخل متادیتای ویدیو (فیلد ThumbnailUri) ذخیره می‌شود.
+    /// </summary>
+    public async Task<(Uri?, Uri?)> UploadVideoWithThumbnailAsync(string publicId,
+                                                         string folder,
+                                                         string tags,
+                                                         MemoryStream video,
+                                                         string? originalFileName = null)
     {
-        var paths = GetPaths(folder, publicId);
-        if (!File.Exists(paths.DataPath) || !File.Exists(paths.MetadataPath))
-        {
-            return null;
-        }
+        //// ---------- 1️⃣ ذخیرهٔ ویدیو (بدون thumbnail) ----------
+        //var videoUri = await PersistEncryptedAsync(publicId,
+        //                                            folder,
+        //                                            video.ToArray(),
+        //                                            originalFileName,
+        //                                            "video/mp4"
+        //                                            );
 
-        var metadataJson = await File.ReadAllTextAsync(paths.MetadataPath);
-        var metadata = JsonSerializer.Deserialize<StoredMediaMetadata>(metadataJson, JsonOptions);
-        if (metadata is null)
-        {
-            throw new InvalidOperationException("Stored media metadata is invalid.");
-        }
+        // ---------- 2️⃣ تولید thumbnail ----------
+        video.Position = 0;                         // بازنشانی استریم
+        var thumbBytes = await CreateThumbnailAsync(video);
+        var thumbFolder = Path.Combine(folder, "thumbnails");
+        var thumbId = $"{publicId}_thumb";
 
-        await using var fileStream = new FileStream(paths.DataPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
-        var iv = new byte[16];
-        var readIv = await fileStream.ReadAsync(iv);
-        if (readIv != iv.Length)
-        {
-            throw new InvalidOperationException("Encrypted media file is corrupted.");
-        }
+        // ---------- 3️⃣ ذخیرهٔ thumbnail (بدون thumbnailUri) ----------
+        await PersistEncryptedAsync(thumbId,
+                                    thumbFolder,
+                                    thumbBytes,
+                                    $"{publicId}_thumb.jpg",
+                                    "image/jpeg");
 
-        using var aes = Aes.Create();
-        aes.Key = _fileStorageConfig.EncryptionKey;
-        aes.IV = iv;
-        aes.Mode = CipherMode.CBC;
-        aes.Padding = PaddingMode.PKCS7;
+        // ---------- 4️⃣ به‌روزرسانی متادیتای ویدیو با URI تصویر کوچک ----------
+        // این فراخوانی فقط برای نوشتن متادیتای جدید (ThumbnailUri) انجام می‌شود.
+        var uris = await PersistEncryptedAsync(publicId,
+                                      folder,
+                                      video.ToArray(),
+                                      originalFileName,
+                                      "video/mp4",
+                                      thumbFolder,
+                                      thumbId);
 
-        using var cryptoStream = new CryptoStream(fileStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-        using var memoryStream = new MemoryStream();
-        await cryptoStream.CopyToAsync(memoryStream);
-
-        return new StoredMediaFile(memoryStream.ToArray(), metadata.ContentType, metadata.OriginalFileName);
+        // مسیر عمومی ویدیو را برمی‌گردانیم
+        return new(uris.Item1, uris.Item2);
     }
 
-    private async Task<Uri> UploadBinaryAsync(string publicId, string folder, MemoryStream stream, string defaultContentType, string? originalFileName)
+    #endregion
+
+    #region ----------- Private Helpers ------------------------------------
+
+    private async Task<Uri> UploadBinaryAsync(string publicId,
+                                              string folder,
+                                              MemoryStream stream,
+                                              string defaultContentType,
+                                              string? originalFileName)
     {
         var bytes = stream.ToArray();
-        await PersistEncryptedAsync(publicId, folder, bytes, originalFileName, defaultContentType);
-        return BuildPublicUri(folder, publicId);
+        var uri = await PersistEncryptedAsync(publicId,
+                                            folder,
+                                            bytes,
+                                            originalFileName,
+                                            defaultContentType);
+        return uri.Item1;
     }
 
-    private async Task PersistEncryptedAsync(string publicId, string folder, byte[] plainBytes, string? originalFileName, string defaultContentType)
+    /// <summary>
+    /// ذخیرهٔ داده‌ها به‌صورت رمزنگاری‌شده، نوشتن متادیتا
+    /// و (در صورت ارائه) پر کردن فیلد ThumbnailUri.
+    /// در صورت موفقیت، URI عمومی مورد ذخیره‌سازی برگردانده می‌شود.
+    /// </summary>
+    private async Task<(Uri?, Uri?)> PersistEncryptedAsync(string publicId,
+                                                  string folder,
+                                                  byte[] plainBytes,
+                                                  string? originalFileName,
+                                                  string defaultContentType,
+                                                  string? thumbFolder = null,
+                                                  string? thumbId = null)
     {
         var paths = GetPaths(folder, publicId);
         var contentType = ResolveContentType(plainBytes, originalFileName, defaultContentType);
@@ -85,25 +142,109 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
             ContentType = contentType,
             OriginalFileName = originalFileName,
             Size = plainBytes.LongLength,
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = DateTime.UtcNow,
+
+            // اگر مسیر thumbnail داده شد، در اینجا قرار می‌گیرد
+            ThumbnailUri = (thumbFolder != null && thumbId != null)
+                           ? BuildPublicUri(thumbFolder, thumbId)
+                           : null
         };
 
+        // ---------- رمزنگاری و نوشتن فایل ----------
         using var aes = Aes.Create();
         aes.Key = _fileStorageConfig.EncryptionKey;
         aes.GenerateIV();
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.PKCS7;
 
-        await using (var fileStream = new FileStream(paths.DataPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+        await using (var fileStream = new FileStream(paths.DataPath,
+                                                    FileMode.Create,
+                                                    FileAccess.Write,
+                                                    FileShare.None,
+                                                    81920,
+                                                    useAsync: true))
         {
+            // ابتدا IV را می‌نویسیم
             await fileStream.WriteAsync(aes.IV);
-            await using var cryptoStream = new CryptoStream(fileStream, aes.CreateEncryptor(), CryptoStreamMode.Write, leaveOpen: false);
+            await using var cryptoStream = new CryptoStream(fileStream,
+                                                            aes.CreateEncryptor(),
+                                                            CryptoStreamMode.Write,
+                                                            leaveOpen: false);
             await cryptoStream.WriteAsync(plainBytes);
             cryptoStream.FlushFinalBlock();
         }
 
+        // ---------- نوشتن متادیتا ----------
         var metadataJson = JsonSerializer.Serialize(metadata, JsonOptions);
         await File.WriteAllTextAsync(paths.MetadataPath, metadataJson);
+
+        // بازگشت مسیر عمومی (URI) برای فراخوانی‌کننده
+        return new(BuildPublicUri(folder, publicId), metadata.ThumbnailUri);
+    }
+
+    private async Task<byte[]> CreateThumbnailAsync(Stream videoStream)
+    {
+        // ذخیرهٔ موقت ویدیو
+        var tmpVideo = Path.GetTempFileName();
+        await using (var file = new FileStream(tmpVideo, FileMode.Create, FileAccess.Write))
+            await videoStream.CopyToAsync(file);
+
+        // مسیر تصویر کوچک موقت
+        var tmpImg = Path.GetTempFileName() + ".jpg";
+
+        // استخراج فریم صفر ثانیه (یا زمان دلخواه)
+        var conversion = await FFmpeg.Conversions.FromSnippet.Snapshot(tmpVideo, tmpImg, TimeSpan.FromSeconds(0));
+        await conversion.Start();
+
+        var bytes = await File.ReadAllBytesAsync(tmpImg);
+
+        // حذف فایل‌های موقت
+        File.Delete(tmpVideo);
+        File.Delete(tmpImg);
+
+        return bytes;
+    }
+
+    public async Task<StoredMediaFile?> GetFileAsync(string folder, string publicId)
+    {
+        var paths = GetPaths(folder, publicId);
+        if (!File.Exists(paths.DataPath) || !File.Exists(paths.MetadataPath))
+            return null;
+
+        var metadataJson = await File.ReadAllTextAsync(paths.MetadataPath);
+        var metadata = JsonSerializer.Deserialize<StoredMediaMetadata>(metadataJson, JsonOptions);
+        if (metadata is null)
+            throw new InvalidOperationException("Stored media metadata is invalid.");
+
+        await using var fileStream = new FileStream(paths.DataPath,
+                                                    FileMode.Open,
+                                                    FileAccess.Read,
+                                                    FileShare.Read,
+                                                    81920,
+                                                    useAsync: true);
+        var iv = new byte[16];
+        var readIv = await fileStream.ReadAsync(iv);
+        if (readIv != iv.Length)
+            throw new InvalidOperationException("Encrypted media file is corrupted.");
+
+        using var aes = Aes.Create();
+        aes.Key = _fileStorageConfig.EncryptionKey;
+        aes.IV = iv;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+
+        await using var cryptoStream = new CryptoStream(fileStream,
+                                                        aes.CreateDecryptor(),
+                                                        CryptoStreamMode.Read);
+        await using var memoryStream = new MemoryStream();
+        await cryptoStream.CopyToAsync(memoryStream);
+
+        return new StoredMediaFile(
+            memoryStream.ToArray(),
+            metadata.ContentType,
+            metadata.OriginalFileName,
+            metadata.ThumbnailUri?.ToString()
+        );
     }
 
     private Uri BuildPublicUri(string folder, string publicId)
@@ -129,9 +270,7 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
     private static string SanitizeSegment(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-        {
             throw new ArgumentException("Media path segment cannot be empty.", nameof(value));
-        }
 
         var sanitizedChars = value
             .Trim()
@@ -139,35 +278,32 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
             .ToArray();
 
         var sanitized = new string(sanitizedChars).Trim('.');
+
         if (string.IsNullOrWhiteSpace(sanitized))
-        {
             throw new ArgumentException("Media path segment is invalid.", nameof(value));
-        }
 
         return sanitized;
     }
 
-    private static string ResolveContentType(byte[] bytes, string? originalFileName, string defaultContentType)
+    private static string ResolveContentType(byte[] bytes,
+                                              string? originalFileName,
+                                              string defaultContentType)
     {
         if (!string.IsNullOrWhiteSpace(originalFileName))
         {
-            var byExtension = GetContentTypeFromExtension(Path.GetExtension(originalFileName));
-            if (!string.IsNullOrWhiteSpace(byExtension))
-            {
-                return byExtension;
-            }
+            var byExt = GetContentTypeFromExtension(Path.GetExtension(originalFileName));
+            if (!string.IsNullOrWhiteSpace(byExt))
+                return byExt;
         }
 
-        var bySignature = GetContentTypeFromSignature(bytes);
-        return bySignature ?? defaultContentType;
+        var bySig = GetContentTypeFromSignature(bytes);
+        return bySig ?? defaultContentType;
     }
 
     private static string? GetContentTypeFromExtension(string? extension)
     {
         if (string.IsNullOrWhiteSpace(extension))
-        {
             return null;
-        }
 
         return extension.ToLowerInvariant() switch
         {
@@ -192,55 +328,60 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
 
     private static string? GetContentTypeFromSignature(byte[] bytes)
     {
+        // JPEG
         if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-        {
             return "image/jpeg";
-        }
 
+        // PNG
         if (bytes.Length >= 8 &&
             bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
             bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
-        {
             return "image/png";
-        }
 
+        // GIF
         if (bytes.Length >= 6 &&
             bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 &&
             bytes[3] == 0x38 && (bytes[4] == 0x37 || bytes[4] == 0x39) && bytes[5] == 0x61)
-        {
             return "image/gif";
-        }
 
+        // WebP
         if (bytes.Length >= 12 &&
             bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
             bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
-        {
             return "image/webp";
-        }
 
+        // MP4
         if (bytes.Length >= 12 &&
             bytes[4] == 0x66 && bytes[5] == 0x74 && bytes[6] == 0x79 && bytes[7] == 0x70)
-        {
             return "video/mp4";
-        }
 
+        // MP3 (ID3)
         if (bytes.Length >= 3 && bytes[0] == 0x49 && bytes[1] == 0x44 && bytes[2] == 0x33)
-        {
             return "audio/mpeg";
-        }
 
-        if (bytes.Length >= 4 &&
-            bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46)
-        {
+        // WAV (RIFF … WAVE)
+        if (bytes.Length >= 12 &&
+            bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+            bytes[8] == 0x57 && bytes[9] == 0x41 && bytes[10] == 0x56 && bytes[11] == 0x45)
             return "audio/wav";
-        }
 
+        // PDF
         if (bytes.Length >= 4 &&
             bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46)
-        {
             return "application/pdf";
-        }
 
+        // ZIP (PK..)
+        if (bytes.Length >= 4 &&
+            bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04)
+            return "application/zip";
+
+        // RAR (older)
+        if (bytes.Length >= 7 &&
+            bytes[0] == 0x52 && bytes[1] == 0x61 && bytes[2] == 0x72 && bytes[3] == 0x21 &&
+            bytes[4] == 0x1A && bytes[5] == 0x07 && bytes[6] == 0x00)
+            return "application/vnd.rar";
+
+        // اگر هیچ کدام مطابقت نداشت
         return null;
     }
 
@@ -250,5 +391,8 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
         public string? OriginalFileName { get; init; }
         public long Size { get; init; }
         public DateTime UpdatedAtUtc { get; init; }
+        public Uri? ThumbnailUri { get; init; }
     }
+
 }
+#endregion

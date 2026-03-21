@@ -12,6 +12,7 @@ public sealed class Message
 
     [Required]
     public string Content { get; set; } = string.Empty;
+    public string ThumbnailUrl { get; set; } = string.Empty;
 
     [MaxLength(255)]
     public string? FileName { get; set; }

@@ -4,6 +4,7 @@ using System.Text.Json;
 
 namespace ChatNest.Shared.DTOs
 {
+
     public class UserDto
     {
         public string? MobileNo { get; set; } = string.Empty;
