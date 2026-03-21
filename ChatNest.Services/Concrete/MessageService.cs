@@ -76,8 +76,15 @@ namespace ChatNest.Services.Concrete
                 switch (dto.ContentType)
                 {
                     case MessageContent.Image:
-                        mediaUrl = await _mediaStorageRepository.UploadPhotoAsync($"message_{message.Id}", "messages", "message,image", fileStream, dto.FileName);
+                        (mediaUrl, thumbUrl) = await _mediaStorageRepository
+                            .UploadPhotoWithThumbnailAsync(
+                                $"message_{message.Id}",
+                                "messages",
+                                "message,image",
+                                fileStream,
+                                dto.FileName);
                         break;
+
                     case MessageContent.Video:
                         (mediaUrl, thumbUrl) = await _mediaStorageRepository.UploadVideoWithThumbnailAsync($"message_{message.Id}", "messages", "message,video", fileStream, dto.FileName);
                         break;

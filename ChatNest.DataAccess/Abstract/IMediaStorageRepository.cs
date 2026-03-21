@@ -12,6 +12,15 @@ public interface IMediaStorageRepository
                                                          string tags,
                                                          MemoryStream video,
                                                          string? originalFileName = null);
+    Task<(Uri?, Uri?)> UploadPhotoWithThumbnailAsync(
+                        string publicId,
+                        string folder,
+                        string tags,
+                        MemoryStream photo,
+                        string? originalFileName = null,
+                        int thumbWidth = 250,
+                        int thumbHeight = 250);
+
     Task<Uri> UploadVideoAsync(string publicId,
                                string folder,
                                string tags,

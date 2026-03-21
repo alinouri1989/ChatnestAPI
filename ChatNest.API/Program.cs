@@ -29,7 +29,6 @@ Log.Logger = new LoggerConfiguration()
         retainedFileCountLimit: 14,
         shared: true)
     .CreateBootstrapLogger();
-FFmpeg.SetExecutablesPath(@"C:\Program Files\ffmpeg\bin\");
 
 try
 {
@@ -51,6 +50,7 @@ try
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 60,
             shared: true));
+    FFmpeg.SetExecutablesPath(builder.Configuration["FileStorage:PathFFmpeg"]);
 
     // Add DbContext
     builder.Services.AddDbContext<ChatNestDbContext>(options =>

@@ -1,5 +1,7 @@
 ﻿using ChatNest.DataAccess.Abstract;
 using ChatNest.DataAccess.Configurations;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Xabe.FFmpeg;
@@ -56,6 +58,79 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
                                                "application/octet-stream");
         return (uri.Item1, bytes.LongLength);
     }
+
+    public async Task<(Uri?, Uri?)> UploadPhotoWithThumbnailAsync(
+    string publicId,
+    string folder,
+    string tags,
+    MemoryStream photo,
+    string? originalFileName = null,
+    int thumbWidth = 250,          // عرض پیش‌فرض thumbnail
+    int thumbHeight = 250)         // ارتفاع پیش‌فرض (اگر 0 باشد نسبت‌مند می‌شود)
+    {
+        // ---------- 1️⃣ ذخیرهٔ تصویر اصلی (بدون thumbnail) ----------
+        var originalUri = await PersistEncryptedAsync(
+            publicId,
+            folder,
+            photo.ToArray(),
+            originalFileName,
+            "image/jpeg");          // فرض می‌کنیم jpeg ذخیره می‌شود؛ می‌توانید نوع راDynamic کنید
+
+        // ---------- 2️⃣ ساخت thumbnail ----------
+        photo.Position = 0;                     // بازنشانی استریم
+        var thumbBytes = await CreateImageThumbnailAsync(photo, thumbWidth, thumbHeight);
+
+        // ---------- 3️⃣ ذخیرهٔ thumbnail ----------
+        var thumbFolder = Path.Combine(folder, "thumbnails");
+        var thumbId = $"{publicId}_thumb";
+
+        await PersistEncryptedAsync(
+            thumbId,
+            thumbFolder,
+            thumbBytes,
+            $"{publicId}_thumb.jpg",
+            "image/jpeg");
+
+        // ---------- 4️⃣ بروزرسانی متادیتای تصویر اصلی با URI thumbnail ----------
+        var uris = await PersistEncryptedAsync(
+            publicId,
+            folder,
+            photo.ToArray(),
+            originalFileName,
+            "image/jpeg",
+            thumbFolder,
+            thumbId);
+
+        // برگرداندن (uri تصویر اصلی , uri thumbnail)
+        return (uris.Item1, uris.Item2);
+    }
+    private async Task<byte[]> CreateImageThumbnailAsync(
+        Stream imageStream,
+        int width,
+        int height)
+    {
+        // ImageSharp به صورت async کار نمی‌کند، پس از MemoryStream استفاده می‌کنیم
+        using var image = await Image.LoadAsync(imageStream);
+
+        // اگر فقط عرض یا فقط ارتفاع داده شده باشد، نسبت حفظ می‌شود
+        if (width > 0 && height > 0)
+            image.Mutate(x => x.Resize(width, height));
+        else if (width > 0)
+            image.Mutate(x => x.Resize(width, 0));
+        else if (height > 0)
+            image.Mutate(x => x.Resize(0, height));
+        else
+            throw new ArgumentException("حداقل یکی از عرض یا ارتفاع باید بزرگتر از صفر باشد.");
+
+        // ذخیره به فرمت JPEG (می‌توانید quality را هم تنظیم کنید)
+        var ms = new MemoryStream();
+        await image.SaveAsJpegAsync(ms, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder
+        {
+            Quality = 65   // کیفیت مناسب – می‌توانید تغییر دهید
+        });
+        return ms.ToArray();
+    }
+
 
     /// <summary>
     /// آپلود ویدیو به همراه ساخت thumbnail.

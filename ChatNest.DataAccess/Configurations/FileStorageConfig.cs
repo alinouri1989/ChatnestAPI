@@ -15,11 +15,13 @@ public sealed class FileStorageConfig
         PublicBaseUrl = (configuration["FileStorage:PublicBaseUrl"] ?? "http://localhost:5000").TrimEnd('/');
         PublicRoutePrefix = NormalizeRoutePrefix(configuration["FileStorage:PublicRoutePrefix"] ?? "/api/media");
         EncryptionKey = ResolveEncryptionKey(configuration["FileStorage:EncryptionKey"]);
+        PathFFmpeg = NormalizeRoutePrefix(configuration["FileStorage:PathFFmpeg"]);
     }
 
     public string RootPath { get; }
     public string PublicBaseUrl { get; }
     public string PublicRoutePrefix { get; }
+    public string PathFFmpeg { get; }
     public byte[] EncryptionKey { get; }
 
     private static string NormalizeRoutePrefix(string value)
