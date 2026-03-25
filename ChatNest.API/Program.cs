@@ -14,6 +14,7 @@ using ChatNest.Shared.DTOs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -179,20 +180,43 @@ try
 
     // Add AutoMapper
     builder.Services.AddAutoMapper(typeof(MappingProfile));
-    RedisConfiguration rdc = builder.Configuration.GetSection("Redis").Get<RedisConfiguration>()!;
-    var host = rdc.Host;
-    // Add SignalR
-    builder.Services.AddSignalR(options =>
-                    {
-                        options.MaximumReceiveMessageSize = 700L * 1024 * 1024;
-                    })
-                    .AddJsonProtocol(options =>
-                    {
-                        options.PayloadSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-                    }).AddStackExchangeRedis($"{host.Host}:{host.Port}", options =>
-                    {
-                        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("ChatNest");
-                    });
+    builder.Services.AddSingleton<IUserIdProvider, SubClaimUserIdProvider>();
+    builder.Services.AddSingleton<IUserPresenceTracker, UserPresenceTracker>();
+
+    var signalRBuilder = builder.Services.AddSignalR(options =>
+    {
+        // Keep SignalR payloads small; file uploads are chunked.
+        options.MaximumReceiveMessageSize = 2L * 1024 * 1024;
+        options.EnableDetailedErrors = false;
+        options.ClientTimeoutInterval = TimeSpan.FromSeconds(120);
+        options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+        options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+        options.StreamBufferCapacity = 20;
+    })
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
+
+    var redisEnabled = builder.Configuration.GetValue<bool>("Redis:Enabled");
+    var redisConnection = builder.Configuration["Redis:ConnectionString"];
+    if (string.IsNullOrWhiteSpace(redisConnection))
+    {
+        var redisHost = builder.Configuration["Redis:Hosts:0:Host"];
+        var redisPort = builder.Configuration["Redis:Hosts:0:Port"] ?? "6379";
+        if (!string.IsNullOrWhiteSpace(redisHost))
+        {
+            redisConnection = $"{redisHost}:{redisPort},abortConnect=false,connectTimeout=5000,syncTimeout=5000";
+        }
+    }
+
+    if (redisEnabled && !string.IsNullOrWhiteSpace(redisConnection))
+    {
+        signalRBuilder.AddStackExchangeRedis(redisConnection, options =>
+        {
+            options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("ChatNest");
+        });
+    }
 
 
     // Add Controllers

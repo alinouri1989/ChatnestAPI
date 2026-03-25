@@ -33,6 +33,25 @@ namespace ChatNest.DataAccess.Concrete
             return await _context.Users.FindAsync(userId);
         }
 
+        public async Task<Dictionary<string, User>> GetUsersByIdsAsync(IEnumerable<string> userIds)
+        {
+            var uniqueIds = (userIds ?? Enumerable.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+
+            if (uniqueIds.Count == 0)
+            {
+                return new Dictionary<string, User>();
+            }
+
+            var users = await _context.Users
+                .Where(u => uniqueIds.Contains(u.Id))
+                .ToListAsync();
+
+            return users.ToDictionary(u => u.Id, u => u);
+        }
+
         public async Task<User?> GetUserByEmailAsync(string email)
         {
             return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);

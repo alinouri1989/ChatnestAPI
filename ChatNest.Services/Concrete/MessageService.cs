@@ -101,7 +101,7 @@ namespace ChatNest.Services.Concrete
                 }
 
                 message.Content = mediaUrl!.ToString();
-                message.ThumbnailUrl = thumbUrl!.ToString();
+                message.ThumbnailUrl = thumbUrl?.ToString();
                 message.FileName = dto.FileName;
                 message.FileSize = fileSize;
             }

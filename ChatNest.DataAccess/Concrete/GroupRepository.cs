@@ -54,6 +54,26 @@ namespace ChatNest.DataAccess.Concrete
                 .FirstOrDefaultAsync(g => g.Id == groupId);
         }
 
+        public async Task<Dictionary<Guid, Group>> GetGroupsByIdsAsync(IEnumerable<Guid> groupIds)
+        {
+            var uniqueIds = (groupIds ?? Enumerable.Empty<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (uniqueIds.Count == 0)
+            {
+                return new Dictionary<Guid, Group>();
+            }
+
+            var groups = await _context.Groups
+                .Include(g => g.Creator)
+                .Where(g => uniqueIds.Contains(g.Id))
+                .ToListAsync();
+
+            return groups.ToDictionary(g => g.Id, g => g);
+        }
+
         public async Task<List<string>> GetGroupParticipantsIdsAsync(Guid groupId)
         {
             var group = await _context.Groups.FindAsync(groupId);

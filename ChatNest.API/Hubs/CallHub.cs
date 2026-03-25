@@ -168,6 +168,8 @@ namespace ChatNest.API.Hubs
                 {
                     { "callId", callId },
                     { "callType", callType },
+                    { "callerId", UserId },
+                    { "recipientId", recipientId },
                     { recipientId, recipientProfiles.ContainsKey(recipientId) ? recipientProfiles[recipientId] : null }
                 });
 
@@ -175,6 +177,8 @@ namespace ChatNest.API.Hubs
                 {
                     { "callId", callId },
                     { "callType", callType },
+                    { "callerId", UserId },
+                    { "recipientId", recipientId },
                     { UserId, recipientProfiles.ContainsKey(UserId) ? recipientProfiles[UserId] : null }
                 });
             }
@@ -323,6 +327,7 @@ namespace ChatNest.API.Hubs
                     {
                         await Clients.User(participant).SendAsync("ReceiveSdp", new Dictionary<string, object>
                         {
+                            {"callId", callId },
                             {"sdp", sdp },
                             {"callType", call.Type }
                         });
@@ -362,7 +367,11 @@ namespace ChatNest.API.Hubs
                 {
                     if (!participant.Equals(UserId))
                     {
-                        await Clients.User(participant).SendAsync("ReceiveIceCandidate", iceCandidate);
+                        await Clients.User(participant).SendAsync("ReceiveIceCandidate", new Dictionary<string, object>
+                        {
+                            { "callId", callId },
+                            { "iceCandidate", iceCandidate }
+                        });
                     }
                 }
             }

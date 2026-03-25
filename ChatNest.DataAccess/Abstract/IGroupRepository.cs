@@ -8,6 +8,7 @@ namespace ChatNest.DataAccess.Abstract
         Task CreateOrUpdateGroupAsync(Group group);
         Task<IEnumerable<Group>> GetAllGroupsAsync();
         Task<Group?> GetGroupByIdAsync(Guid groupId);
+        Task<Dictionary<Guid, Group>> GetGroupsByIdsAsync(IEnumerable<Guid> groupIds);
         Task<List<string>> GetGroupParticipantsIdsAsync(Guid groupId);
         Task UpdateGroupParticipantsAsync(Guid groupId, Dictionary<string, GroupParticipant> groupParticipants);
         Task<bool> DeleteGroupAsync(Guid groupId);

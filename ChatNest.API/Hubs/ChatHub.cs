@@ -26,25 +26,37 @@ namespace ChatNest.API.Hubs
         private readonly IMapper _mapper;
 
         private static readonly ConcurrentDictionary<string, PendingUploadSession> PendingUploads = new();
-        private const long MaxUploadBytes = 700L * 1024 * 1024;
+        private static readonly TimeSpan PendingUploadTtl = TimeSpan.FromMinutes(20);
+        private const long MaxUploadBytes = 200L * 1024 * 1024;
 
         private sealed class PendingUploadSession : IDisposable
         {
             public required string Id { get; init; }
             public required string OwnerUserId { get; init; }
-            public required string OwnerConnectionId { get; init; }
             public required string ChatType { get; init; }
             public required string ChatId { get; init; }
             public required MessageContent ContentType { get; init; }
             public required string FileName { get; init; }
+            public required string TempFilePath { get; init; }
             public string? ClientMessageId { get; init; }
-            public MemoryStream Buffer { get; } = new();
+            public long BytesWritten { get; set; }
+            public DateTime LastActivityUtc { get; set; } = DateTime.UtcNow;
             public SemaphoreSlim SyncLock { get; } = new(1, 1);
 
             public void Dispose()
             {
                 SyncLock.Dispose();
-                Buffer.Dispose();
+                try
+                {
+                    if (File.Exists(TempFilePath))
+                    {
+                        File.Delete(TempFilePath);
+                    }
+                }
+                catch
+                {
+                    // Best effort cleanup.
+                }
             }
         }
         /// <summary>
@@ -95,7 +107,6 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.MinValue);
                 await base.OnConnectedAsync();
             }
             catch (Exception ex)
@@ -113,16 +124,14 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                await _userService.UpdateLastConnectionDateAsync(UserId, DateTime.UtcNow);
+                CleanupExpiredPendingUploads();
             }
             catch (Exception ex)
             {
-                // Log the exception but don't send to client since they're disconnecting
-                Console.WriteLine($"Error updating last connection date: {ex.Message}");
+                Console.WriteLine($"Error while cleaning up pending uploads: {ex.Message}");
             }
             finally
             {
-                CleanupPendingUploadsForConnection(Context.ConnectionId);
                 await base.OnDisconnectedAsync(exception);
             }
         }
@@ -267,9 +276,17 @@ namespace ChatNest.API.Hubs
             if (!PendingUploads.TryGetValue(uploadId, out var found))
                 return false;
 
-            if (!string.Equals(found.OwnerUserId, UserId, StringComparison.Ordinal) ||
-                !string.Equals(found.OwnerConnectionId, Context.ConnectionId, StringComparison.Ordinal))
+            if (!string.Equals(found.OwnerUserId, UserId, StringComparison.Ordinal))
             {
+                return false;
+            }
+
+            if (DateTime.UtcNow - found.LastActivityUtc > PendingUploadTtl)
+            {
+                if (PendingUploads.TryRemove(uploadId, out var expiredSession))
+                {
+                    expiredSession.Dispose();
+                }
                 return false;
             }
 
@@ -277,13 +294,10 @@ namespace ChatNest.API.Hubs
             return true;
         }
 
-        private static void CleanupPendingUploadsForConnection(string connectionId)
+        private static void CleanupExpiredPendingUploads()
         {
-            if (string.IsNullOrWhiteSpace(connectionId))
-                return;
-
             var staleUploadIds = PendingUploads
-                .Where(item => string.Equals(item.Value.OwnerConnectionId, connectionId, StringComparison.Ordinal))
+                .Where(item => DateTime.UtcNow - item.Value.LastActivityUtc > PendingUploadTtl)
                 .Select(item => item.Key)
                 .ToList();
 
@@ -346,6 +360,42 @@ namespace ChatNest.API.Hubs
             await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", emptyRecipientProfiles);
         }
 
+        private async Task<string?> BroadcastIndividualChatAsync(Dictionary<string, ChatDto> chat)
+        {
+            var chatEntity = chat.Values.FirstOrDefault();
+            if (chatEntity == null)
+            {
+                return null;
+            }
+
+            var chatId = chatEntity.Id.ToString();
+            var chatParticipants = await _chatService.GetChatParticipantsAsync(chatId);
+
+            var chatResponse = new Dictionary<string, Dictionary<string, ChatDto>> { { "Individual", chat } };
+            foreach (var participant in chatParticipants)
+            {
+                await Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);
+            }
+
+            var recipientProfiles = await _userService.GetRecipientProfilesAsync(chatParticipants);
+            foreach (var participant in chatParticipants)
+            {
+                var profileUserId = chatParticipants.FirstOrDefault(p => p != participant) ?? participant;
+                if (!recipientProfiles.TryGetValue(profileUserId, out var profileData))
+                {
+                    continue;
+                }
+
+                var profileResponse = new Dictionary<string, object>
+                {
+                    { profileUserId, profileData }
+                };
+                await Clients.User(participant).SendAsync("ReceiveRecipientProfiles", profileResponse);
+            }
+
+            return chatId;
+        }
+
         /// <summary>
         /// یک گفتگوی جدید شروع می‌کند و اطلاعات گفتگو را به شرکت‌کنندگان ارسال می‌کند.
         /// </summary>
@@ -364,34 +414,7 @@ namespace ChatNest.API.Hubs
 
                 if (chatType.Equals("Individual", StringComparison.OrdinalIgnoreCase))
                 {
-                    var chatEntity = chat.Values.FirstOrDefault();
-                    if (chatEntity != null)
-                    {
-                        var chatParticipants = await _chatService.GetChatParticipantsAsync(chatEntity.Id.ToString());
-
-                        // Send chat to all participants
-                        var chatResponse = new Dictionary<string, Dictionary<string, ChatDto>> { { "Individual", chat } };
-                        foreach (var participant in chatParticipants)
-                        {
-                            await Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);
-                        }
-
-                        // Send recipient profiles to participants
-                        var recipientProfiles = await _userService.GetRecipientProfilesAsync(chatParticipants);
-
-                        foreach (var participant in chatParticipants)
-                        {
-                            var otherParticipantId = chatParticipants.FirstOrDefault(p => p != participant);
-                            if (!string.IsNullOrEmpty(otherParticipantId) && recipientProfiles.ContainsKey(otherParticipantId))
-                            {
-                                var profileResponse = new Dictionary<string, object>
-                                {
-                                    { otherParticipantId, recipientProfiles[otherParticipantId] }
-                                };
-                                await Clients.User(participant).SendAsync("ReceiveRecipientProfiles", profileResponse);
-                            }
-                        }
-                    }
+                    await BroadcastIndividualChatAsync(chat);
                 }
                 else if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
                 {
@@ -415,6 +438,33 @@ namespace ChatNest.API.Hubs
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// چت شخصی کاربر (Saved Messages) را ایجاد یا بازیابی می‌کند.
+        /// </summary>
+        /// <returns>شناسه چت Saved Messages.</returns>
+        public async Task<string> GetOrCreateSavedMessagesChat()
+        {
+            try
+            {
+                var chat = await _chatService.CreateChatAsync(UserId, "Individual", UserId);
+                var chatId = await BroadcastIndividualChatAsync(chat);
+                return chatId ?? string.Empty;
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                return string.Empty;
             }
         }
 
@@ -531,18 +581,28 @@ namespace ChatNest.API.Hubs
 
             var uploadId = Guid.NewGuid().ToString("N");
             var safeFileName = string.IsNullOrWhiteSpace(fileName) ? "attachment" : fileName.Trim();
+            CleanupExpiredPendingUploads();
+
+            var uploadRoot = Path.Combine(Path.GetTempPath(), "chatnest_uploads");
+            Directory.CreateDirectory(uploadRoot);
+            var tempFilePath = Path.Combine(uploadRoot, $"{uploadId}.tmp");
 
             var session = new PendingUploadSession
             {
                 Id = uploadId,
                 OwnerUserId = UserId,
-                OwnerConnectionId = Context.ConnectionId,
                 ChatType = chatType,
                 ChatId = chatId,
                 ContentType = parsedContentType,
                 FileName = safeFileName,
-                ClientMessageId = clientMessageId
+                ClientMessageId = clientMessageId,
+                TempFilePath = tempFilePath
             };
+
+            using (File.Create(tempFilePath))
+            {
+                // Ensure file is present and empty.
+            }
 
             PendingUploads[uploadId] = session;
             return Task.FromResult(uploadId);
@@ -576,12 +636,28 @@ namespace ChatNest.API.Hubs
             await session.SyncLock.WaitAsync();
             try
             {
-                await session.Buffer.WriteAsync(chunkBytes, 0, chunkBytes.Length);
-
-                if (session.Buffer.Length > MaxUploadBytes)
+                if (session.BytesWritten + chunkBytes.Length > MaxUploadBytes)
                 {
                     PendingUploads.TryRemove(uploadId, out oversizedSession);
-                    throw new BadRequestException("File size exceeds the allowed limit");
+                    throw new BadRequestException("File size exceeds the allowed limit (200MB)");
+                }
+
+                await using var fileStream = new FileStream(
+                    session.TempFilePath,
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.None,
+                    81920,
+                    useAsync: true);
+
+                await fileStream.WriteAsync(chunkBytes, 0, chunkBytes.Length);
+                session.BytesWritten += chunkBytes.Length;
+                session.LastActivityUtc = DateTime.UtcNow;
+
+                if (session.BytesWritten > MaxUploadBytes)
+                {
+                    PendingUploads.TryRemove(uploadId, out oversizedSession);
+                    throw new BadRequestException("File size exceeds the allowed limit (200MB)");
                 }
             }
             finally
@@ -606,7 +682,13 @@ namespace ChatNest.API.Hubs
             {
                 await removedSession.SyncLock.WaitAsync();
 
-                if (removedSession.Buffer.Length == 0)
+                removedSession.LastActivityUtc = DateTime.UtcNow;
+
+                if (removedSession.BytesWritten <= 0 || !File.Exists(removedSession.TempFilePath))
+                    throw new BadRequestException("Uploaded file is empty");
+
+                var fileBytes = await File.ReadAllBytesAsync(removedSession.TempFilePath);
+                if (fileBytes.LongLength == 0)
                     throw new BadRequestException("Uploaded file is empty");
 
                 var dto = new SendMessage
@@ -615,7 +697,7 @@ namespace ChatNest.API.Hubs
                     Content = "__chunk_upload__",
                     ClientMessageId = removedSession.ClientMessageId,
                     FileName = removedSession.FileName,
-                    File = removedSession.Buffer.ToArray()
+                    File = fileBytes
                 };
 
                 var (message, chatParticipants) = await _messageService.SendMessageAsync(

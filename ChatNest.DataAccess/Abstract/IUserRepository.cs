@@ -7,6 +7,7 @@ namespace ChatNest.DataAccess.Abstract
         Task<IEnumerable<User>> GetAllUsersAsync();
         Task CreateUserAsync(User user);
         Task<User?> GetUserByIdAsync(string userId);
+        Task<Dictionary<string, User>> GetUsersByIdsAsync(IEnumerable<string> userIds);
         Task<User?> GetUserByEmailAsync(string email);
         Task<User?> GetUserByProviderIdAsync(string providerId);
         Task UpdateUserFieldAsync(string userId, string fieldName, object newValue);

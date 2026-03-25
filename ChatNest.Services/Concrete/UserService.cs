@@ -76,11 +76,10 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, CallerUser>> GetUserProfilesAsync(List<string> recipientIds)
         {
             var result = new Dictionary<string, CallerUser>();
-
-            foreach (var id in recipientIds)
+            var usersById = await _userRepository.GetUsersByIdsAsync(recipientIds);
+            foreach (var id in recipientIds.Distinct())
             {
-                var user = await _userRepository.GetUserByIdAsync(id);
-                if (user != null)
+                if (usersById.TryGetValue(id, out var user))
                 {
                     result.Add(id, _mapper.Map<CallerUser>(user));
                 }
@@ -304,11 +303,10 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, RecipientProfile>> GetRecipientProfilesAsync(List<string> recipientIds)
         {
             var result = new Dictionary<string, RecipientProfile>();
-
-            foreach (var id in recipientIds)
+            var usersById = await _userRepository.GetUsersByIdsAsync(recipientIds);
+            foreach (var id in recipientIds.Distinct())
             {
-                var user = await _userRepository.GetUserByIdAsync(id);
-                if (user != null)
+                if (usersById.TryGetValue(id, out var user))
                 {
                     result.Add(id, _mapper.Map<RecipientProfile>(user));
                 }

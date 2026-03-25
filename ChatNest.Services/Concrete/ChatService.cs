@@ -134,21 +134,28 @@ namespace ChatNest.Services.Concrete
                 {
                     result.Add("Individual", individualChats);
 
-                    // Get participants from junction table for individual chats
-                    foreach (var chat in individualChats.Values)
+                    // Participants are already loaded with chats (ChatParticipants include).
+                    foreach (var chatEntity in userChats.Where(c => c.ChatType == "Individual"))
                     {
-                        try
+                        var chatParticipants = chatEntity.ChatParticipants
+                            .Select(cp => cp.UserId)
+                            .Where(p => !string.IsNullOrWhiteSpace(p))
+                            .Distinct()
+                            .ToList();
+
+                        var otherParticipants = chatParticipants
+                            .Where(p => p != userId)
+                            .ToList();
+
+                        if (otherParticipants.Count > 0)
                         {
-                            var participants = await _chatRepository.GetChatParticipantsAsync(chat.Id);
-                            if (participants != null)
-                            {
-                                individualParticipants.AddRange(participants.Where(p => p != userId));
-                            }
+                            individualParticipants.AddRange(otherParticipants);
                         }
-                        catch (Exception ex)
+                        else if (chatParticipants.Contains(userId))
                         {
-                            // Log the exception but continue processing
-                            Console.WriteLine($"Error getting participants for chat {chat.Id}: {ex.Message}");
+                            // Self-chat (Saved Messages) has no "other" participant;
+                            // include current user so UI can resolve profile.
+                            individualParticipants.Add(userId);
                         }
                     }
                     individualParticipants = individualParticipants.Distinct().ToList();

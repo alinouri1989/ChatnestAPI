@@ -14,6 +14,7 @@ namespace ChatNest.API.Hubs
     public sealed class NotificationHub : Hub
     {
         private readonly IUserService _userService;
+        private readonly IUserPresenceTracker _presenceTracker;
 
         /// <summary>
         /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
@@ -42,9 +43,10 @@ namespace ChatNest.API.Hubs
         /// یک نمونه جدید از کلاس <see cref="NotificationHub"/> را ایجاد می‌کند.
         /// </summary>
         /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
-        public NotificationHub(IUserService userService)
+        public NotificationHub(IUserService userService, IUserPresenceTracker presenceTracker)
         {
             _userService = userService;
+            _presenceTracker = presenceTracker;
         }
 
         /// <summary>
@@ -57,6 +59,17 @@ namespace ChatNest.API.Hubs
             try
             {
                 await base.OnConnectedAsync();
+
+                var becameOnline = _presenceTracker.AddConnection(UserId, Context.ConnectionId);
+                if (becameOnline)
+                {
+                    var onlineMarker = DateTime.MinValue;
+                    await _userService.UpdateLastConnectionDateAsync(UserId, onlineMarker);
+                    await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
+                    {
+                        { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", onlineMarker } } }
+                    });
+                }
             }
             catch (Exception ex)
             {
@@ -74,13 +87,17 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                DateTime lastConnectionDate = DateTime.UtcNow;
-                await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
-
-                await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
+                var becameOffline = _presenceTracker.RemoveConnection(UserId, Context.ConnectionId);
+                if (becameOffline)
                 {
-                    { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", lastConnectionDate } } }
-                });
+                    DateTime lastConnectionDate = DateTime.UtcNow;
+                    await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
+
+                    await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
+                    {
+                        { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", lastConnectionDate } } }
+                    });
+                }
             }
             catch (Exception ex)
             {
@@ -102,16 +119,6 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                // Convention used by clients: DateTime.MinValue means "online"
-                DateTime onlineMarker = DateTime.MinValue;
-                await _userService.UpdateLastConnectionDateAsync(UserId, onlineMarker);
-
-                // Notify others that user is now online
-                await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
-                {
-                    { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", onlineMarker } } }
-                });
-
                 // Send successful initialization response
                 await Clients.Caller.SendAsync("NotificationHubInitialized", new { status = "connected", timestamp = DateTime.UtcNow });
             }

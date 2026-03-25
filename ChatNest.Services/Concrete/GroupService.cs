@@ -71,7 +71,9 @@ namespace ChatNest.Services.Concrete
             return participants;
         }
 
-        private async Task<GroupProfile> MapGroupToProfileSafeAsync(Group group)
+        private async Task<GroupProfile> MapGroupToProfileSafeAsync(
+            Group group,
+            IReadOnlyDictionary<string, User>? usersById = null)
         {
             // ✅ این Map دیگه Participants رو دست نمی‌زنه (تو MappingProfile Ignore کردی)
             var profile = _mapper.Map<GroupProfile>(group);
@@ -81,8 +83,15 @@ namespace ChatNest.Services.Concrete
 
             foreach (var (participantId, role) in group.Participants)
             {
-                // ⚠️ این متد رو مطابق IUserRepository خودت تنظیم کن
-                var user = await _userRepository.GetUserByIdAsync(participantId);
+                User? user = null;
+                if (usersById != null && usersById.TryGetValue(participantId, out var batchUser))
+                {
+                    user = batchUser;
+                }
+                else
+                {
+                    user = await _userRepository.GetUserByIdAsync(participantId);
+                }
 
                 dict[participantId] = new ParticipantProfile
                 {
@@ -219,15 +228,37 @@ namespace ChatNest.Services.Concrete
         public async Task<Dictionary<string, GroupProfile>> GetGroupProfilesAsync(List<string> userGroupIds)
         {
             var result = new Dictionary<string, GroupProfile>();
+            var parsedGroupIds = userGroupIds
+                .Select(id => Guid.TryParse(id, out var gid) ? gid : Guid.Empty)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
 
-            foreach (var groupId in userGroupIds)
+            if (parsedGroupIds.Count == 0)
             {
-                if (!Guid.TryParse(groupId, out var gid)) continue;
+                return result;
+            }
 
-                var group = await _groupRepository.GetGroupByIdAsync(gid);
-                if (group == null) continue;
+            var groupsById = await _groupRepository.GetGroupsByIdsAsync(parsedGroupIds);
+            var participantIds = groupsById.Values
+                .SelectMany(g => g.Participants.Keys)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+            var usersById = await _userRepository.GetUsersByIdsAsync(participantIds);
 
-                result[groupId] = await MapGroupToProfileSafeAsync(group);
+            foreach (var groupId in userGroupIds.Distinct())
+            {
+                if (!Guid.TryParse(groupId, out var gid))
+                {
+                    continue;
+                }
+                if (!groupsById.TryGetValue(gid, out var group))
+                {
+                    continue;
+                }
+
+                result[groupId] = await MapGroupToProfileSafeAsync(group, usersById);
             }
 
             return result;
