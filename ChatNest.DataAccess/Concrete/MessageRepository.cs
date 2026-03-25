@@ -7,6 +7,7 @@ namespace ChatNest.DataAccess.Concrete
 {
     public sealed class MessageRepository : IMessageRepository
     {
+        private const string DeletedMessageTombstone = "این پیام حذف شده است.";
         private readonly ChatNestDbContext _context;
 
         public MessageRepository(ChatNestDbContext context)
@@ -68,13 +69,13 @@ namespace ChatNest.DataAccess.Concrete
         {
             return await _context.Messages
                 .Include(m => m.Sender)
-                .FirstOrDefaultAsync(m => m.Id == messageId);
+                .FirstOrDefaultAsync(m => m.Id == messageId && m.Content != DeletedMessageTombstone);
         }
 
         public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5)
         {
             return await _context.Messages
-                .Where(m => m.ChatId == chatId)
+                .Where(m => m.ChatId == chatId && m.Content != DeletedMessageTombstone)
                 .Include(m => m.Sender)
                 .OrderByDescending(m => m.CreatedDate)
                 .Skip(skip)
@@ -84,7 +85,7 @@ namespace ChatNest.DataAccess.Concrete
 
         public async Task<DateTime?> GetLatestMessageDateAsync(Guid chatId, DateTime? beforeUtc = null)
         {
-            var query = _context.Messages.Where(m => m.ChatId == chatId);
+            var query = _context.Messages.Where(m => m.ChatId == chatId && m.Content != DeletedMessageTombstone);
             if (beforeUtc.HasValue)
             {
                 query = query.Where(m => m.CreatedDate < beforeUtc.Value);
@@ -99,7 +100,10 @@ namespace ChatNest.DataAccess.Concrete
         public async Task<IEnumerable<Message>> GetChatMessagesByDateRangeAsync(Guid chatId, DateTime startUtc, DateTime endUtc)
         {
             return await _context.Messages
-                .Where(m => m.ChatId == chatId && m.CreatedDate >= startUtc && m.CreatedDate < endUtc)
+                .Where(m => m.ChatId == chatId &&
+                            m.CreatedDate >= startUtc &&
+                            m.CreatedDate < endUtc &&
+                            m.Content != DeletedMessageTombstone)
                 .Include(m => m.Sender)
                 .OrderBy(m => m.CreatedDate)
                 .ToListAsync();
@@ -107,13 +111,15 @@ namespace ChatNest.DataAccess.Concrete
 
         public async Task<bool> HasMessagesBeforeAsync(Guid chatId, DateTime beforeUtc)
         {
-            return await _context.Messages.AnyAsync(m => m.ChatId == chatId && m.CreatedDate < beforeUtc);
+            return await _context.Messages.AnyAsync(m => m.ChatId == chatId &&
+                                                         m.CreatedDate < beforeUtc &&
+                                                         m.Content != DeletedMessageTombstone);
         }
 
         public async Task<int> GetTotalMessageCountAsync(Guid chatId)
         {
             return await _context.Messages
-                .CountAsync(m => m.ChatId == chatId);
+                .CountAsync(m => m.ChatId == chatId && m.Content != DeletedMessageTombstone);
         }
 
         public async Task UpdateMessageAsync(Message message)

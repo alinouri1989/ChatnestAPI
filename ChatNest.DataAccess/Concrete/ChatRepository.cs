@@ -6,6 +6,7 @@ namespace ChatNest.DataAccess.Concrete;
 
 public class ChatRepository : IChatRepository
 {
+    private const string DeletedMessageTombstone = "این پیام حذف شده است.";
     private readonly ChatNestDbContext _context;
 
     public ChatRepository(ChatNestDbContext context)
@@ -30,7 +31,7 @@ public class ChatRepository : IChatRepository
     public async Task<Chat?> GetChatByIdAsync(Guid id)
     {
         return await ApplyGroupIntegrityFilter(_context.Chats)
-            .Include(c => c.Messages)
+            .Include(c => c.Messages.Where(m => m.Content != DeletedMessageTombstone))
             .Include(c => c.ChatParticipants)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
@@ -39,7 +40,7 @@ public class ChatRepository : IChatRepository
     {
         return await ApplyGroupIntegrityFilter(_context.Chats)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
-            .Include(c => c.Messages)
+            .Include(c => c.Messages.Where(m => m.Content != DeletedMessageTombstone))
             .Include(c => c.ChatParticipants)
             .Skip(skip)
             .Take(take)
@@ -49,7 +50,10 @@ public class ChatRepository : IChatRepository
     public async Task<IEnumerable<Chat>> GetUserChatsAsync(string userId, int skip = 0, int take = 5)
     {
         return await ApplyGroupIntegrityFilter(_context.Chats)
-            .Include(c => c.Messages.OrderByDescending(c => c.CreatedDate).Skip(0).Take(10))
+            .Include(c => c.Messages
+                .Where(m => m.Content != DeletedMessageTombstone)
+                .OrderByDescending(m => m.CreatedDate)
+                .Take(10))
             .Include(c => c.ChatParticipants)
             .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
             .OrderByDescending(c => c.CreatedDate)
@@ -133,7 +137,7 @@ public class ChatRepository : IChatRepository
         // Get all chats that have participants matching our list
         var potentialChats = await _context.Chats
             .Include(c => c.ChatParticipants)
-            .Include(c => c.Messages)
+            .Include(c => c.Messages.Where(m => m.Content != DeletedMessageTombstone))
             .Where(c => c.ChatParticipants.Any(cp => participantIds.Contains(cp.UserId)))
             .ToListAsync();
 

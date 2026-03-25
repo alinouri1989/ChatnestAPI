@@ -61,7 +61,7 @@ namespace ChatNest.Services.Concrete
                     var isAdmin = group.Participants.TryGetValue(userId, out var role) &&
                                   role == GroupParticipant.Admin;
                     if (!isAdmin)
-                        throw new ForbiddenException("Only channel admins can send messages");
+                        throw new ForbiddenException("فقط مدیران کانال دسترسی ارسال پیام دارند");
                 }
             }
 
@@ -173,7 +173,8 @@ namespace ChatNest.Services.Concrete
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(
             string userId, string chatType, string chatId, string messageId, byte deletionType)
         {
-            var message = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            var parsedMessageId = Guid.Parse(messageId);
+            var message = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
             if (message == null)
                 throw new NotFoundException("Message not found");
 
@@ -186,34 +187,48 @@ namespace ChatNest.Services.Concrete
                 if (message.SenderId != userId)
                     throw new BadRequestException("You can only delete your own messages for everyone");
 
-                // Use a tombstone payload instead of physical deletion so clients can update UI
-                // consistently (e.g., "This message was deleted") without losing message identity.
-                message.Content = "این پیام حذف شده است.";
-                message.Type = MessageContent.Text;
-                message.FileName = null;
-                message.FileSize = null;
+                await _messageRepository.DeleteMessageAsync(parsedMessageId);
+                var deletedAt = DateTime.UtcNow;
+                var deleteMarker = new Message
+                {
+                    Id = parsedMessageId,
+                    ChatId = Guid.Parse(chatId),
+                    SenderId = message.SenderId,
+                    Content = string.Empty,
+                    Type = MessageContent.Text,
+                    CreatedDate = deletedAt,
+                    Status = message.Status,
+                    DeletedFor = chat.ChatParticipants.ToDictionary(participant => participant.UserId, _ => deletedAt)
+                };
 
-                await _messageRepository.UpdateMessageAsync(message);
+                var deletedMessageResult = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
+                {
+                    { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, deleteMarker } } } } }
+                };
+
+                return (deletedMessageResult, chat.ChatParticipants.Select(c => c.UserId).ToList());
             }
-            else // Delete for me only
+
+            // Delete for me only
+            else
             {
                 var deletedFor = message.DeletedFor;
                 deletedFor[userId] = DateTime.UtcNow;
-                await _messageRepository.UpdateMessageDeletedForAsync(Guid.Parse(messageId), deletedFor);
-            }
+                await _messageRepository.UpdateMessageDeletedForAsync(parsedMessageId, deletedFor);
 
-            var updatedMessage = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
-            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>();
+                var updatedMessage = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
+                var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>();
 
-            if (updatedMessage != null)
-            {
-                result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
+                if (updatedMessage != null)
                 {
-                    { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage } } } } }
-                };
-            }
+                    result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
+                    {
+                        { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage } } } } }
+                    };
+                }
 
-            return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
+                return (result, new List<string> { userId });
+            }
         }
 
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(
