@@ -39,6 +39,7 @@ namespace ChatNest.API.Hubs
             public required string FileName { get; init; }
             public required string TempFilePath { get; init; }
             public string? ClientMessageId { get; init; }
+            public string? ReplyToMessageId { get; init; }
             public long BytesWritten { get; set; }
             public DateTime LastActivityUtc { get; set; } = DateTime.UtcNow;
             public SemaphoreSlim SyncLock { get; } = new(1, 1);
@@ -564,7 +565,8 @@ namespace ChatNest.API.Hubs
             string chatId,
             int contentType,
             string fileName,
-            string? clientMessageId = null)
+            string? clientMessageId = null,
+            string? replyToMessageId = null)
         {
             if (string.IsNullOrWhiteSpace(chatType))
                 throw new BadRequestException("ChatType is required");
@@ -596,6 +598,7 @@ namespace ChatNest.API.Hubs
                 ContentType = parsedContentType,
                 FileName = safeFileName,
                 ClientMessageId = clientMessageId,
+                ReplyToMessageId = replyToMessageId,
                 TempFilePath = tempFilePath
             };
 
@@ -697,7 +700,8 @@ namespace ChatNest.API.Hubs
                     Content = "__chunk_upload__",
                     ClientMessageId = removedSession.ClientMessageId,
                     FileName = removedSession.FileName,
-                    File = fileBytes
+                    File = fileBytes,
+                    ReplyToMessageId = removedSession.ReplyToMessageId
                 };
 
                 var (message, chatParticipants) = await _messageService.SendMessageAsync(

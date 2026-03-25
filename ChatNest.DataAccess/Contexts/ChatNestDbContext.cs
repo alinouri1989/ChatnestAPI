@@ -126,6 +126,7 @@ namespace ChatNest.DataAccess.Contexts
                 entity.Property(e => e.Content).IsRequired();
                 entity.Property(e => e.ThumbnailUrl);
                 entity.Property(e => e.FileName).HasMaxLength(255);
+                entity.Property(e => e.ReplyToFileName).HasMaxLength(255);
                 entity.Property(e => e.SenderId).IsRequired();
                 entity.Property(e => e.StatusJson).HasColumnType("nvarchar(max)");
                 entity.Property(e => e.DeletedForJson).HasColumnType("nvarchar(max)");
@@ -143,6 +144,7 @@ namespace ChatNest.DataAccess.Contexts
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.CreatedBy).IsRequired();
+                entity.Property(e => e.Kind).HasDefaultValue(ChatNest.Entities.Enums.GroupKind.Group);
                 entity.Property(e => e.ParticipantsJson).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.Photo)

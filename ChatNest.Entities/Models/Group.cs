@@ -33,6 +33,8 @@ public sealed class Group
     [Required]
     public string CreatedBy { get; set; } = string.Empty;
 
+    public GroupKind Kind { get; set; } = GroupKind.Group;
+
     public DateTime CreatedDate { get; set; }
 
     // Navigation property

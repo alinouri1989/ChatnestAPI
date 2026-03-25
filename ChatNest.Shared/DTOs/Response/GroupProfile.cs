@@ -1,4 +1,6 @@
-﻿namespace ChatNest.Shared.DTOs.Response
+using ChatNest.Entities.Enums;
+
+namespace ChatNest.Shared.DTOs.Response
 {
     /// <summary>
     /// شیء انتقال داده (DTO) شامل اطلاعات پایه پروفایل گروه و فهرست اعضا.
@@ -12,5 +14,6 @@
         public Dictionary<string, ParticipantProfile> Participants { get; set; } = new();
         public string? CreatedBy { get; init; }
         public string? PhotoUrl { get; init; }
+        public GroupKind Kind { get; init; } = GroupKind.Group;
     }
 }

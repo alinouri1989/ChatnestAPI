@@ -27,6 +27,8 @@ namespace ChatNest.Shared.DTOs
 
         public string CreatedBy { get; set; } = string.Empty;
 
+        public GroupKind Kind { get; set; } = GroupKind.Group;
+
         public DateTime CreatedDate { get; set; }
 
         public UserDto? Creator { get; set; }

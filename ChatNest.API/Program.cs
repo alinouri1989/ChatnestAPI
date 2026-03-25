@@ -10,7 +10,6 @@ using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Concrete;
 using ChatNest.Services.Mapping;
-using ChatNest.Shared.DTOs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;

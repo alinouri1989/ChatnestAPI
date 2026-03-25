@@ -1,4 +1,4 @@
-﻿using ChatNest.Entities.Enums;
+using ChatNest.Entities.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace ChatNest.Shared.DTOs.Request
@@ -18,5 +18,6 @@ namespace ChatNest.Shared.DTOs.Request
         public string? ClientMessageId { get; init; }
         public byte[]? File { get; set; }
         public string? FileName { get; set; }
+        public string? ReplyToMessageId { get; init; }
     }
 }

@@ -119,6 +119,7 @@ namespace ChatNest.Services.Concrete
                 Name = dto.Name,
                 Description = dto.Description ?? string.Empty,
                 CreatedBy = userId,
+                Kind = dto.Kind,
                 CreatedDate = DateTime.UtcNow,
             };
 
@@ -164,6 +165,7 @@ namespace ChatNest.Services.Concrete
 
             group.Name = dto.Name;
             group.Description = dto.Description ?? string.Empty;
+            group.Kind = dto.Kind;
 
             var updatedParticipants = BuildParticipantsFromRequest(dto, group.CreatedBy, group.Participants);
             group.ParticipantsJson = JsonSerializer.Serialize(updatedParticipants);

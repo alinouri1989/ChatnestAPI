@@ -22,6 +22,16 @@ namespace ChatNest.Shared.DTOs
 
         public Guid ChatId { get; set; }
 
+        public Guid? ReplyToMessageId { get; set; }
+
+        public string? ReplyToSenderId { get; set; }
+
+        public MessageContent? ReplyToType { get; set; }
+
+        public string? ReplyToContent { get; set; }
+
+        public string? ReplyToFileName { get; set; }
+
         // Store as JSON string in database
         public string StatusJson { get; set; } = string.Empty;
 

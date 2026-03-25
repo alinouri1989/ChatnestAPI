@@ -12,19 +12,35 @@ namespace ChatNest.Services.Concrete
     {
         private readonly IMessageRepository _messageRepository;
         private readonly IChatRepository _chatRepository;
+        private readonly IGroupRepository _groupRepository;
         private readonly IMediaStorageRepository _mediaStorageRepository;
         private readonly IMapper _mapper;
 
         public MessageService(
             IMessageRepository messageRepository,
             IChatRepository chatRepository,
+            IGroupRepository groupRepository,
             IMediaStorageRepository mediaStorageRepository,
             IMapper mapper)
         {
             _messageRepository = messageRepository;
             _chatRepository = chatRepository;
+            _groupRepository = groupRepository;
             _mediaStorageRepository = mediaStorageRepository;
             _mapper = mapper;
+        }
+
+        private static string BuildReplyPreviewContent(Message referencedMessage)
+        {
+            return referencedMessage.Type switch
+            {
+                MessageContent.Text => referencedMessage.Content,
+                MessageContent.Image => "Photo",
+                MessageContent.Video => "Video",
+                MessageContent.Audio => "Voice message",
+                MessageContent.File => referencedMessage.FileName ?? "File",
+                _ => "Message"
+            };
         }
 
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(
@@ -34,6 +50,35 @@ namespace ChatNest.Services.Concrete
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
                 throw new NotFoundException("Chat not found or access denied");
 
+            if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
+            {
+                var group = await _groupRepository.GetGroupByIdAsync(chat.Id);
+                if (group == null)
+                    throw new NotFoundException("Group not found");
+
+                if (group.Kind == GroupKind.Channel)
+                {
+                    var isAdmin = group.Participants.TryGetValue(userId, out var role) &&
+                                  role == GroupParticipant.Admin;
+                    if (!isAdmin)
+                        throw new ForbiddenException("Only channel admins can send messages");
+                }
+            }
+
+            Guid? replyToMessageId = null;
+            Message? referencedMessage = null;
+            if (!string.IsNullOrWhiteSpace(dto.ReplyToMessageId))
+            {
+                if (!Guid.TryParse(dto.ReplyToMessageId, out var parsedReplyId))
+                    throw new BadRequestException("Invalid reply message id");
+
+                referencedMessage = await _messageRepository.GetMessageByIdAsync(parsedReplyId);
+                if (referencedMessage == null || referencedMessage.ChatId != chat.Id)
+                    throw new NotFoundException("Reply target message not found");
+
+                replyToMessageId = parsedReplyId;
+            }
+
             var message = new Message
             {
                 Id = Guid.NewGuid(),
@@ -42,6 +87,11 @@ namespace ChatNest.Services.Concrete
                 Content = dto.Content,
                 Type = dto.ContentType,
                 ClientMessageId = dto.ClientMessageId,
+                ReplyToMessageId = replyToMessageId,
+                ReplyToSenderId = referencedMessage?.SenderId,
+                ReplyToType = referencedMessage?.Type,
+                ReplyToContent = referencedMessage != null ? BuildReplyPreviewContent(referencedMessage) : null,
+                ReplyToFileName = referencedMessage?.FileName,
                 CreatedDate = DateTime.UtcNow,
                 Status = new MessageStatus
                 {
