@@ -82,6 +82,34 @@ namespace ChatNest.DataAccess.Concrete
                 .ToListAsync();
         }
 
+        public async Task<DateTime?> GetLatestMessageDateAsync(Guid chatId, DateTime? beforeUtc = null)
+        {
+            var query = _context.Messages.Where(m => m.ChatId == chatId);
+            if (beforeUtc.HasValue)
+            {
+                query = query.Where(m => m.CreatedDate < beforeUtc.Value);
+            }
+
+            return await query
+                .OrderByDescending(m => m.CreatedDate)
+                .Select(m => (DateTime?)m.CreatedDate)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<IEnumerable<Message>> GetChatMessagesByDateRangeAsync(Guid chatId, DateTime startUtc, DateTime endUtc)
+        {
+            return await _context.Messages
+                .Where(m => m.ChatId == chatId && m.CreatedDate >= startUtc && m.CreatedDate < endUtc)
+                .Include(m => m.Sender)
+                .OrderBy(m => m.CreatedDate)
+                .ToListAsync();
+        }
+
+        public async Task<bool> HasMessagesBeforeAsync(Guid chatId, DateTime beforeUtc)
+        {
+            return await _context.Messages.AnyAsync(m => m.ChatId == chatId && m.CreatedDate < beforeUtc);
+        }
+
         public async Task<int> GetTotalMessageCountAsync(Guid chatId)
         {
             return await _context.Messages

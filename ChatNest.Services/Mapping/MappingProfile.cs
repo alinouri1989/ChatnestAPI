@@ -32,7 +32,6 @@ namespace ChatNest.Services.Mapping
             // SignUp => User
             CreateMap<SignUp, User>()
                 .ForMember(dest => dest.Biography, opt => opt.MapFrom(_ => "سلام، من از ChatNest استفاده می‌کنم."))
-                .ForMember(dest => dest.ProfilePhoto, opt => opt.MapFrom(_ => new Uri("/Image/DefaultUserProfilePhoto.png", UriKind.Relative)))
                 .ForMember(dest => dest.ProviderId, opt => opt.MapFrom(_ => "email"))
                 .ForMember(dest => dest.LastConnectionDate, opt => opt.MapFrom(_ => DateTime.UtcNow))
                 .ForMember(dest => dest.UserSettings, opt => opt.MapFrom(_ => new UserSettings()))

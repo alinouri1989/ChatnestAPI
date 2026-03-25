@@ -90,7 +90,7 @@ namespace ChatNest.Services.Concrete
                     DisplayName = user?.DisplayName ?? string.Empty,
 
                     // ✅ required member باید همینجا ست بشه
-                    ProfilePhoto = user?.ProfilePhoto?.ToString() ?? "/Image/DefaultUserProfilePhoto.png",
+                    ProfilePhoto = user?.ProfilePhoto?.ToString() ?? "",
 
                     Role = role
                 };
@@ -155,8 +155,9 @@ namespace ChatNest.Services.Concrete
 
             group.Name = dto.Name;
             group.Description = dto.Description ?? string.Empty;
-            group.ParticipantsJson = JsonSerializer.Serialize(
-                BuildParticipantsFromRequest(dto, group.CreatedBy, group.Participants));
+
+            var updatedParticipants = BuildParticipantsFromRequest(dto, group.CreatedBy, group.Participants);
+            group.ParticipantsJson = JsonSerializer.Serialize(updatedParticipants);
 
             if (!string.IsNullOrWhiteSpace(dto.Photo))
             {
@@ -174,6 +175,7 @@ namespace ChatNest.Services.Concrete
             }
 
             await _groupRepository.CreateOrUpdateGroupAsync(group);
+            await SyncGroupChatParticipantsAsync(group.Id, updatedParticipants);
 
             var profile = await MapGroupToProfileSafeAsync(group);
 
@@ -181,6 +183,37 @@ namespace ChatNest.Services.Concrete
             {
                 { group.Id.ToString(), profile }
             };
+        }
+
+        private async Task SyncGroupChatParticipantsAsync(Guid groupId, Dictionary<string, GroupParticipant> updatedParticipants)
+        {
+            var chat = await _chatRepository.GetChatByIdAsync(groupId);
+            if (chat == null)
+                return;
+
+            var activeParticipants = updatedParticipants
+                .Where(p => p.Value != GroupParticipant.Former)
+                .Select(p => p.Key)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .ToHashSet();
+
+            var currentChatParticipants = await _chatRepository.GetChatParticipantsAsync(groupId);
+            var currentSet = currentChatParticipants
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .ToHashSet();
+
+            var toAdd = activeParticipants.Except(currentSet).ToList();
+            var toRemove = currentSet.Except(activeParticipants).ToList();
+
+            foreach (var participantId in toAdd)
+            {
+                await _chatRepository.AddParticipantAsync(groupId, participantId);
+            }
+
+            foreach (var participantId in toRemove)
+            {
+                await _chatRepository.RemoveParticipantAsync(groupId, participantId);
+            }
         }
 
         public async Task<Dictionary<string, GroupProfile>> GetGroupProfilesAsync(List<string> userGroupIds)

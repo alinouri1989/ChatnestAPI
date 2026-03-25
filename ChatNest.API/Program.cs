@@ -10,6 +10,7 @@ using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Concrete;
 using ChatNest.Services.Mapping;
+using ChatNest.Shared.DTOs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
@@ -178,19 +179,21 @@ try
 
     // Add AutoMapper
     builder.Services.AddAutoMapper(typeof(MappingProfile));
-
+    RedisConfiguration rdc = builder.Configuration.GetSection("Redis").Get<RedisConfiguration>()!;
+    var host = rdc.Host;
     // Add SignalR
     builder.Services.AddSignalR(options =>
                     {
-                        // File/image messages are currently sent as Base64 through the hub.
-                        // Default SignalR limit (~32KB) closes the connection for upload payloads.
-                        // +700MB covers the existing 700MB file limit plus Base64 overhead.
                         options.MaximumReceiveMessageSize = 700L * 1024 * 1024;
                     })
                     .AddJsonProtocol(options =>
                     {
                         options.PayloadSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+                    }).AddStackExchangeRedis($"{host.Host}:{host.Port}", options =>
+                    {
+                        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("ChatNest");
                     });
+
 
     // Add Controllers
     builder.Services.AddControllers();

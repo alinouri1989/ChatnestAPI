@@ -196,5 +196,49 @@ namespace ChatNest.Services.Concrete
 
         public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5) =>
                        await _messageRepository.GetChatMessagesAsync(chatId, skip, take);
+
+        public async Task<ChatNest.Shared.DTOs.ChatMessagesPageResponse> GetChatMessagesByDayAsync(
+            string userId,
+            Guid chatId,
+            DateTime? beforeUtc = null)
+        {
+            var chat = await _chatRepository.GetChatByIdAsync(chatId);
+            if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
+                throw new NotFoundException("Chat not found or access denied");
+
+            var total = await _messageRepository.GetTotalMessageCountAsync(chatId);
+            var latest = await _messageRepository.GetLatestMessageDateAsync(chatId, beforeUtc);
+
+            if (!latest.HasValue)
+            {
+                return new ChatNest.Shared.DTOs.ChatMessagesPageResponse
+                {
+                    ChatId = chatId.ToString(),
+                    TotalCount = total,
+                    Messages = Array.Empty<Message>(),
+                    DayStartUtc = null,
+                    NextCursorUtc = null,
+                    HasMore = false,
+                    IsInitial = !beforeUtc.HasValue
+                };
+            }
+
+            var dayStartUtc = DateTime.SpecifyKind(latest.Value.Date, DateTimeKind.Utc);
+            var dayEndUtc = dayStartUtc.AddDays(1);
+
+            var messages = await _messageRepository.GetChatMessagesByDateRangeAsync(chatId, dayStartUtc, dayEndUtc);
+            var hasMore = await _messageRepository.HasMessagesBeforeAsync(chatId, dayStartUtc);
+
+            return new ChatNest.Shared.DTOs.ChatMessagesPageResponse
+            {
+                ChatId = chatId.ToString(),
+                TotalCount = total,
+                Messages = messages,
+                DayStartUtc = dayStartUtc,
+                NextCursorUtc = hasMore ? dayStartUtc : null,
+                HasMore = hasMore,
+                IsInitial = !beforeUtc.HasValue
+            };
+        }
     }
 }

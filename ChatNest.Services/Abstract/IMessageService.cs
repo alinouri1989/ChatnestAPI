@@ -55,5 +55,14 @@ namespace ChatNest.Services.Abstract
         /// <param name="take"></param>
         /// <returns></returns>
         Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5);
+
+        /// <summary>
+        /// دریافت پیام های یک گفتگو به صورت روز به روز (از جدیدترین روز به قدیمی تر)
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="chatId"></param>
+        /// <param name="beforeUtc"></param>
+        /// <returns></returns>
+        Task<ChatNest.Shared.DTOs.ChatMessagesPageResponse> GetChatMessagesByDayAsync(string userId, Guid chatId, DateTime? beforeUtc = null);
     }
 }

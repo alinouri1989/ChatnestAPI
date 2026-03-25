@@ -207,6 +207,7 @@ namespace ChatNest.Services.Concrete
             }
 
             var updatedChat = await _chatRepository.GetChatByIdAsync(chatGuid);
+            await _chatRepository.DeleteChatAsync(chatGuid);
             var result = new Dictionary<string, Dictionary<string, ChatDto>>
             {
                 { chatType, new Dictionary<string, ChatDto> { { chatId, _mapper.Map<ChatDto>(updatedChat!) } } }

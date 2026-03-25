@@ -1,10 +1,13 @@
 ﻿using AutoMapper;
+using ChatNest.Entities.Enums;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.Security.Claims;
 
 namespace ChatNest.API.Hubs
@@ -21,6 +24,29 @@ namespace ChatNest.API.Hubs
         private readonly IChatService _chatService;
         private readonly IUserService _userService;
         private readonly IMapper _mapper;
+
+        private static readonly ConcurrentDictionary<string, PendingUploadSession> PendingUploads = new();
+        private const long MaxUploadBytes = 700L * 1024 * 1024;
+
+        private sealed class PendingUploadSession : IDisposable
+        {
+            public required string Id { get; init; }
+            public required string OwnerUserId { get; init; }
+            public required string OwnerConnectionId { get; init; }
+            public required string ChatType { get; init; }
+            public required string ChatId { get; init; }
+            public required MessageContent ContentType { get; init; }
+            public required string FileName { get; init; }
+            public string? ClientMessageId { get; init; }
+            public MemoryStream Buffer { get; } = new();
+            public SemaphoreSlim SyncLock { get; } = new(1, 1);
+
+            public void Dispose()
+            {
+                SyncLock.Dispose();
+                Buffer.Dispose();
+            }
+        }
         /// <summary>
         /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
         /// شناسه کاربر از مقدار <see cref="ClaimTypes.NameIdentifier"/> در JWT گرفته می‌شود.
@@ -96,6 +122,7 @@ namespace ChatNest.API.Hubs
             }
             finally
             {
+                CleanupPendingUploadsForConnection(Context.ConnectionId);
                 await base.OnDisconnectedAsync(exception);
             }
         }
@@ -162,6 +189,9 @@ namespace ChatNest.API.Hubs
             try
             {
                 var _chatId = Guid.Parse(chatId);
+                var participants = await _chatService.GetChatParticipantsAsync(chatId);
+                if (!participants.Contains(UserId))
+                    throw new NotFoundException("Chat not found or access denied");
                 var totalChatMessages = await _messageService.GetTotalMessageCountAsync(_chatId);
 
                 await Clients.Caller.SendAsync("ReceiveTotalChatMessages", totalChatMessages);
@@ -183,6 +213,9 @@ namespace ChatNest.API.Hubs
             try
             {
                 var _chatId = Guid.Parse(chatId);
+                var participants = await _chatService.GetChatParticipantsAsync(chatId);
+                if (!participants.Contains(UserId))
+                    throw new NotFoundException("Chat not found or access denied");
                 var total = await _messageService.GetTotalMessageCountAsync(_chatId);
                 var msgs = await _messageService.GetChatMessagesAsync(_chatId, skip, take);
 
@@ -193,6 +226,73 @@ namespace ChatNest.API.Hubs
             {
                 await SendEmptyDataToClient();
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// دریافت پیام های چت کاربر به صورت روزانه (جدیدترین روز تا قدیمی تر)
+        /// </summary>
+        public async Task GetChatMessagesByDayAsync(string chatId, string? beforeUtc = null)
+        {
+            try
+            {
+                var _chatId = Guid.Parse(chatId);
+                DateTime? cursorUtc = null;
+
+                if (!string.IsNullOrWhiteSpace(beforeUtc) &&
+                    DateTime.TryParse(beforeUtc, CultureInfo.InvariantCulture,
+                        DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+                        out var parsed))
+                {
+                    cursorUtc = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+                }
+
+                var response = await _messageService.GetChatMessagesByDayAsync(UserId, _chatId, cursorUtc);
+                await Clients.Caller.SendAsync("ReceiveChatMessages", response);
+            }
+            catch (Exception ex)
+            {
+                await SendEmptyDataToClient();
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        private bool TryGetOwnedPendingUpload(string uploadId, out PendingUploadSession session)
+        {
+            session = null!;
+
+            if (string.IsNullOrWhiteSpace(uploadId))
+                return false;
+
+            if (!PendingUploads.TryGetValue(uploadId, out var found))
+                return false;
+
+            if (!string.Equals(found.OwnerUserId, UserId, StringComparison.Ordinal) ||
+                !string.Equals(found.OwnerConnectionId, Context.ConnectionId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            session = found;
+            return true;
+        }
+
+        private static void CleanupPendingUploadsForConnection(string connectionId)
+        {
+            if (string.IsNullOrWhiteSpace(connectionId))
+                return;
+
+            var staleUploadIds = PendingUploads
+                .Where(item => string.Equals(item.Value.OwnerConnectionId, connectionId, StringComparison.Ordinal))
+                .Select(item => item.Key)
+                .ToList();
+
+            foreach (var uploadId in staleUploadIds)
+            {
+                if (PendingUploads.TryRemove(uploadId, out var session))
+                {
+                    session.Dispose();
+                }
             }
         }
 
@@ -404,6 +504,155 @@ namespace ChatNest.API.Hubs
             {
                 await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// ایجاد یک نشست آپلود فایل برای ارسال chunk ای.
+        /// </summary>
+        public Task<string> BeginFileUpload(
+            string chatType,
+            string chatId,
+            int contentType,
+            string fileName,
+            string? clientMessageId = null)
+        {
+            if (string.IsNullOrWhiteSpace(chatType))
+                throw new BadRequestException("ChatType is required");
+
+            if (!Enum.IsDefined(typeof(MessageContent), contentType))
+                throw new BadRequestException("Invalid message type");
+
+            var parsedContentType = (MessageContent)contentType;
+            if (parsedContentType == MessageContent.Text)
+                throw new BadRequestException("Text messages do not require file upload");
+
+            if (string.IsNullOrWhiteSpace(chatId))
+                throw new BadRequestException("ChatId is required");
+
+            var uploadId = Guid.NewGuid().ToString("N");
+            var safeFileName = string.IsNullOrWhiteSpace(fileName) ? "attachment" : fileName.Trim();
+
+            var session = new PendingUploadSession
+            {
+                Id = uploadId,
+                OwnerUserId = UserId,
+                OwnerConnectionId = Context.ConnectionId,
+                ChatType = chatType,
+                ChatId = chatId,
+                ContentType = parsedContentType,
+                FileName = safeFileName,
+                ClientMessageId = clientMessageId
+            };
+
+            PendingUploads[uploadId] = session;
+            return Task.FromResult(uploadId);
+        }
+
+        /// <summary>
+        /// دریافت یک chunk از فایل (base64) و افزودن به نشست آپلود.
+        /// </summary>
+        public async Task UploadFileChunk(string uploadId, string base64Chunk)
+        {
+            if (!TryGetOwnedPendingUpload(uploadId, out var session))
+                throw new NotFoundException("Upload session not found");
+
+            if (string.IsNullOrWhiteSpace(base64Chunk))
+                throw new BadRequestException("Chunk payload is required");
+
+            byte[] chunkBytes;
+            try
+            {
+                chunkBytes = Convert.FromBase64String(base64Chunk);
+            }
+            catch (FormatException)
+            {
+                throw new BadRequestException("Invalid chunk payload");
+            }
+
+            if (chunkBytes.Length == 0)
+                return;
+
+            PendingUploadSession? oversizedSession = null;
+            await session.SyncLock.WaitAsync();
+            try
+            {
+                await session.Buffer.WriteAsync(chunkBytes, 0, chunkBytes.Length);
+
+                if (session.Buffer.Length > MaxUploadBytes)
+                {
+                    PendingUploads.TryRemove(uploadId, out oversizedSession);
+                    throw new BadRequestException("File size exceeds the allowed limit");
+                }
+            }
+            finally
+            {
+                session.SyncLock.Release();
+                oversizedSession?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// تکمیل آپلود chunk ای و ارسال پیام نهایی به شرکت‌کنندگان چت.
+        /// </summary>
+        public async Task CompleteFileUpload(string uploadId)
+        {
+            if (!TryGetOwnedPendingUpload(uploadId, out _))
+                throw new NotFoundException("Upload session not found");
+
+            if (!PendingUploads.TryRemove(uploadId, out var removedSession))
+                throw new NotFoundException("Upload session not found");
+
+            try
+            {
+                await removedSession.SyncLock.WaitAsync();
+
+                if (removedSession.Buffer.Length == 0)
+                    throw new BadRequestException("Uploaded file is empty");
+
+                var dto = new SendMessage
+                {
+                    ContentType = removedSession.ContentType,
+                    Content = "__chunk_upload__",
+                    ClientMessageId = removedSession.ClientMessageId,
+                    FileName = removedSession.FileName,
+                    File = removedSession.Buffer.ToArray()
+                };
+
+                var (message, chatParticipants) = await _messageService.SendMessageAsync(
+                    UserId,
+                    removedSession.ChatId,
+                    removedSession.ChatType,
+                    dto);
+
+                foreach (var participant in chatParticipants)
+                {
+                    await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
+                }
+            }
+            finally
+            {
+                if (removedSession.SyncLock.CurrentCount == 0)
+                {
+                    removedSession.SyncLock.Release();
+                }
+                removedSession.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// لغو نشست آپلود فایل و آزادسازی منابع مربوطه.
+        /// </summary>
+        public Task AbortFileUpload(string uploadId)
+        {
+            if (!TryGetOwnedPendingUpload(uploadId, out _))
+                return Task.CompletedTask;
+
+            if (PendingUploads.TryRemove(uploadId, out var session))
+            {
+                session.Dispose();
+            }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>
