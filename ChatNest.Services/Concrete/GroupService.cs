@@ -32,6 +32,16 @@ namespace ChatNest.Services.Concrete
             _mapper = mapper;
         }
 
+        private static Guid ParseRequiredGuid(string value, string parameterName)
+        {
+            if (Guid.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+
+            throw new BadRequestException($"Invalid {parameterName}");
+        }
+
         private static Dictionary<string, GroupParticipant> BuildParticipantsFromRequest(
             CreateGroup dto,
             string creatorUserId,
@@ -155,7 +165,8 @@ namespace ChatNest.Services.Concrete
 
         public async Task<Dictionary<string, GroupProfile>> EditGroupAsync(string userId, string groupId, CreateGroup dto)
         {
-            var group = await _groupRepository.GetGroupByIdAsync(Guid.Parse(groupId));
+            var parsedGroupId = ParseRequiredGuid(groupId, "group id");
+            var group = await _groupRepository.GetGroupByIdAsync(parsedGroupId);
             if (group == null)
                 throw new NotFoundException("Group not found");
 
@@ -268,16 +279,17 @@ namespace ChatNest.Services.Concrete
 
         public async Task<List<string>> GetGroupParticipantsAsync(string userId, string groupId)
         {
-            var group = await _groupRepository.GetGroupByIdAsync(Guid.Parse(groupId));
+            var parsedGroupId = ParseRequiredGuid(groupId, "group id");
+            var group = await _groupRepository.GetGroupByIdAsync(parsedGroupId);
             if (group == null || !group.Participants.ContainsKey(userId))
                 throw new NotFoundException("Group not found or access denied");
 
-            return await _groupRepository.GetGroupParticipantsIdsAsync(Guid.Parse(groupId));
+            return await _groupRepository.GetGroupParticipantsIdsAsync(parsedGroupId);
         }
 
         public async Task<Dictionary<string, GroupProfile>> LeaveGroupAsync(string userId, string groupId)
         {
-            var gid = Guid.Parse(groupId);
+            var gid = ParseRequiredGuid(groupId, "group id");
             var group = await _groupRepository.GetGroupByIdAsync(gid);
 
             if (group == null || !group.Participants.ContainsKey(userId))

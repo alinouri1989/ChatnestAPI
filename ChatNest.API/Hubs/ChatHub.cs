@@ -83,6 +83,16 @@ namespace ChatNest.API.Hubs
             }
         }
 
+        private static Guid ParseRequiredGuid(string value, string parameterName)
+        {
+            if (Guid.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+
+            throw new BadRequestException($"Invalid {parameterName}");
+        }
+
         /// <summary>
         /// یک نمونه جدید از کلاس <see cref="ChatHub"/> را ایجاد می‌کند.
         /// </summary>
@@ -198,13 +208,20 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                var _chatId = Guid.Parse(chatId);
+                var _chatId = ParseRequiredGuid(chatId, "chat id");
                 var participants = await _chatService.GetChatParticipantsAsync(chatId);
                 if (!participants.Contains(UserId))
                     throw new NotFoundException("Chat not found or access denied");
                 var totalChatMessages = await _messageService.GetTotalMessageCountAsync(_chatId);
 
                 await Clients.Caller.SendAsync("ReceiveTotalChatMessages", totalChatMessages);
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -222,7 +239,7 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                var _chatId = Guid.Parse(chatId);
+                var _chatId = ParseRequiredGuid(chatId, "chat id");
                 var participants = await _chatService.GetChatParticipantsAsync(chatId);
                 if (!participants.Contains(UserId))
                     throw new NotFoundException("Chat not found or access denied");
@@ -231,6 +248,13 @@ namespace ChatNest.API.Hubs
 
                 var response = new ChatMessagesResponse(total, msgs);
                 await Clients.Caller.SendAsync("ReceiveChatMessages", response);
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -246,7 +270,7 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                var _chatId = Guid.Parse(chatId);
+                var _chatId = ParseRequiredGuid(chatId, "chat id");
                 DateTime? cursorUtc = null;
 
                 if (!string.IsNullOrWhiteSpace(beforeUtc) &&
@@ -259,6 +283,13 @@ namespace ChatNest.API.Hubs
 
                 var response = await _messageService.GetChatMessagesByDayAsync(UserId, _chatId, cursorUtc);
                 await Clients.Caller.SendAsync("ReceiveChatMessages", response);
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {

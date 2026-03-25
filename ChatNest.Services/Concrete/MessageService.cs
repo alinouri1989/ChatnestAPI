@@ -43,12 +43,23 @@ namespace ChatNest.Services.Concrete
             };
         }
 
+        private static Guid ParseRequiredGuid(string value, string parameterName)
+        {
+            if (Guid.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+
+            throw new BadRequestException($"Invalid {parameterName}");
+        }
+
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(
             string userId, string chatId, string chatType, SendMessage dto)
         {
-            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            var parsedChatId = ParseRequiredGuid(chatId, "chat id");
+            var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
-                throw new NotFoundException("Chat not found or access denied");
+                throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");
 
             if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
             {
@@ -74,7 +85,7 @@ namespace ChatNest.Services.Concrete
 
                 referencedMessage = await _messageRepository.GetMessageByIdAsync(parsedReplyId);
                 if (referencedMessage == null || referencedMessage.ChatId != chat.Id)
-                    throw new NotFoundException("Reply target message not found");
+                    throw new NotFoundException("Reply target پیام یافت نشد");
 
                 replyToMessageId = parsedReplyId;
             }
@@ -83,7 +94,7 @@ namespace ChatNest.Services.Concrete
             {
                 Id = Guid.NewGuid(),
                 SenderId = userId,
-                ChatId = Guid.Parse(chatId),
+                ChatId = parsedChatId,
                 Content = dto.Content,
                 Type = dto.ContentType,
                 ClientMessageId = dto.ClientMessageId,
@@ -173,26 +184,27 @@ namespace ChatNest.Services.Concrete
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(
             string userId, string chatType, string chatId, string messageId, byte deletionType)
         {
-            var parsedMessageId = Guid.Parse(messageId);
+            var parsedChatId = ParseRequiredGuid(chatId, "chat id");
+            var parsedMessageId = ParseRequiredGuid(messageId, "message id");
             var message = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
             if (message == null)
-                throw new NotFoundException("Message not found");
+                throw new NotFoundException("پیام یافت نشد");
 
-            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
-                throw new NotFoundException("Chat not found or access denied");
+                throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");
 
             if (deletionType == 1) // Delete for everyone (only sender can do this)
             {
                 if (message.SenderId != userId)
-                    throw new BadRequestException("You can only delete your own messages for everyone");
+                    throw new BadRequestException("شما فقط پیام متعلق به خود را می توانید پاک کنید");
 
                 await _messageRepository.DeleteMessageAsync(parsedMessageId);
                 var deletedAt = DateTime.UtcNow;
                 var deleteMarker = new Message
                 {
                     Id = parsedMessageId,
-                    ChatId = Guid.Parse(chatId),
+                    ChatId = parsedChatId,
                     SenderId = message.SenderId,
                     Content = string.Empty,
                     Type = MessageContent.Text,
@@ -234,21 +246,26 @@ namespace ChatNest.Services.Concrete
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(
             string userId, string chatType, string chatId, string messageId, string fieldName)
         {
-            var message = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            var parsedChatId = ParseRequiredGuid(chatId, "chat id");
+            var parsedMessageId = ParseRequiredGuid(messageId, "message id");
+            var message = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
             if (message == null)
-                throw new NotFoundException("Message not found");
+                throw new NotFoundException("پیام یافت نشد");
 
-            var chat = await _chatRepository.GetChatByIdAsync(Guid.Parse(chatId));
+            var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
-                throw new NotFoundException("Chat not found or access denied");
+                throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");
 
             var statusUpdate = new Dictionary<string, DateTime> { { userId, DateTime.UtcNow } };
-            await _messageRepository.UpdateMessageStatusAsync(Guid.Parse(messageId), fieldName, statusUpdate);
+            await _messageRepository.UpdateMessageStatusAsync(parsedMessageId, fieldName, statusUpdate);
 
-            var updatedMessage = await _messageRepository.GetMessageByIdAsync(Guid.Parse(messageId));
+            var updatedMessage = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
+            if (updatedMessage == null)
+                throw new NotFoundException("پیام یافت نشد");
+
             var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
             {
-                { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage! } } } } }
+                { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage } } } } }
             };
 
             return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
@@ -269,7 +286,7 @@ namespace ChatNest.Services.Concrete
         {
             var chat = await _chatRepository.GetChatByIdAsync(chatId);
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
-                throw new NotFoundException("Chat not found or access denied");
+                throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");
 
             var total = await _messageRepository.GetTotalMessageCountAsync(chatId);
             var latest = await _messageRepository.GetLatestMessageDateAsync(chatId, beforeUtc);

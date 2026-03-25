@@ -32,7 +32,14 @@ namespace ChatNest.DataAccess.Concrete
             if (message != null)
             {
                 message.DeletedFor = deletedFor;
-                await _context.SaveChangesAsync();
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    _context.Entry(message).State = EntityState.Detached;
+                }
             }
         }
 
@@ -61,7 +68,14 @@ namespace ChatNest.DataAccess.Concrete
                 }
 
                 message.Status = status;
-                await _context.SaveChangesAsync();
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    _context.Entry(message).State = EntityState.Detached;
+                }
             }
         }
 
@@ -134,8 +148,16 @@ namespace ChatNest.DataAccess.Concrete
             if (message != null)
             {
                 _context.Messages.Remove(message);
-                await _context.SaveChangesAsync();
-                return true;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    return true;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    _context.Entry(message).State = EntityState.Detached;
+                    return true;
+                }
             }
             return false;
         }

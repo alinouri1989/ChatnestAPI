@@ -88,7 +88,7 @@ namespace ChatNest.DataAccess.Concrete
             if (group != null)
             {
                 group.Participants = groupParticipants;
-                await _context.SaveChangesAsync();
+                await _context.SaveWithConcurrencyRetryAsync();
             }
         }
 
@@ -115,7 +115,7 @@ namespace ChatNest.DataAccess.Concrete
                 }
 
                 _context.Groups.Remove(group);
-                await _context.SaveChangesAsync();
+                await _context.SaveWithConcurrencyRetryAsync();
                 await transaction.CommitAsync();
                 return true;
             }

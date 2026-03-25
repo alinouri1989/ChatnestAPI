@@ -18,6 +18,16 @@ namespace ChatNest.Services.Concrete
             _mapper = mapper;
         }
 
+        private static Guid ParseRequiredGuid(string value, string parameterName)
+        {
+            if (Guid.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+
+            throw new BadRequestException($"Invalid {parameterName}");
+        }
+
         public async Task<string> StartCallAsync(string userId, string recipientId, CallType callType)
         {
             var participants = new List<string> { userId, recipientId };
@@ -52,7 +62,8 @@ namespace ChatNest.Services.Concrete
 
         public async Task AcceptCallAsync(string userId, string callId)
         {
-            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            var parsedCallId = ParseRequiredGuid(callId, "call id");
+            var call = await _callRepository.GetCallByIdAsync(parsedCallId);
             if (call == null)
                 throw new NotFoundException("Call not found");
 
@@ -73,7 +84,8 @@ namespace ChatNest.Services.Concrete
 
         public async Task<Dictionary<string, Call>> EndCallAsync(string userId, string callId, CallStatus callStatus, DateTime? createdDate)
         {
-            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            var parsedCallId = ParseRequiredGuid(callId, "call id");
+            var call = await _callRepository.GetCallByIdAsync(parsedCallId);
             if (call == null)
                 throw new NotFoundException("Call not found");
 
@@ -101,7 +113,8 @@ namespace ChatNest.Services.Concrete
 
         public async Task DeleteCallAsync(string userId, string callId)
         {
-            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            var parsedCallId = ParseRequiredGuid(callId, "call id");
+            var call = await _callRepository.GetCallByIdAsync(parsedCallId);
             if (call == null)
                 throw new NotFoundException("Call not found");
 
@@ -119,7 +132,7 @@ namespace ChatNest.Services.Concrete
 
         public async Task<List<string>> GetCallParticipantsAsync(string userId, string callId)
         {
-            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            var call = await _callRepository.GetCallByIdAsync(ParseRequiredGuid(callId, "call id"));
             if (call == null)
                 throw new NotFoundException("Call not found");
 
@@ -161,7 +174,7 @@ namespace ChatNest.Services.Concrete
 
         public async Task<Call> GetCallAsync(string userId, string callId)
         {
-            var call = await _callRepository.GetCallByIdAsync(Guid.Parse(callId));
+            var call = await _callRepository.GetCallByIdAsync(ParseRequiredGuid(callId, "call id"));
             if (call == null)
                 throw new NotFoundException("Call not found");
 
@@ -176,12 +189,12 @@ namespace ChatNest.Services.Concrete
         // Add new helper methods
         public async Task AddParticipantToCallAsync(string callId, string userId)
         {
-            await _callRepository.AddParticipantAsync(Guid.Parse(callId), userId);
+            await _callRepository.AddParticipantAsync(ParseRequiredGuid(callId, "call id"), userId);
         }
 
         public async Task RemoveParticipantFromCallAsync(string callId, string userId)
         {
-            await _callRepository.RemoveParticipantAsync(Guid.Parse(callId), userId);
+            await _callRepository.RemoveParticipantAsync(ParseRequiredGuid(callId, "call id"), userId);
         }
     }
 }
