@@ -19,5 +19,6 @@ namespace ChatNest.Shared.DTOs.Request
         public byte[]? File { get; set; }
         public string? FileName { get; set; }
         public string? ReplyToMessageId { get; init; }
+        public string ThumbnailUrl { get; set; }
     }
 }

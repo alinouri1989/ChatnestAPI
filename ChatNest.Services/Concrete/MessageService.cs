@@ -98,6 +98,7 @@ namespace ChatNest.Services.Concrete
                 Content = dto.Content,
                 Type = dto.ContentType,
                 ClientMessageId = dto.ClientMessageId,
+                ThumbnailUrl = dto.ThumbnailUrl,
                 ReplyToMessageId = replyToMessageId,
                 ReplyToSenderId = referencedMessage?.SenderId,
                 ReplyToType = referencedMessage?.Type,
@@ -144,10 +145,13 @@ namespace ChatNest.Services.Concrete
                                 "message,image",
                                 fileStream,
                                 dto.FileName);
+                        message.ThumbnailUrl = thumbUrl?.ToString();
+
                         break;
 
                     case MessageContent.Video:
                         (mediaUrl, thumbUrl) = await _mediaStorageRepository.UploadVideoWithThumbnailAsync($"message_{message.Id}", "messages", "message,video", fileStream, dto.FileName);
+                        message.ThumbnailUrl = thumbUrl?.ToString();
                         break;
                     case MessageContent.Audio:
                         mediaUrl = await _mediaStorageRepository.UploadAudioAsync($"message_{message.Id}", "messages", "message,audio", fileStream, dto.FileName);
@@ -162,7 +166,6 @@ namespace ChatNest.Services.Concrete
                 }
 
                 message.Content = mediaUrl!.ToString();
-                message.ThumbnailUrl = thumbUrl?.ToString();
                 message.FileName = dto.FileName;
                 message.FileSize = fileSize;
             }

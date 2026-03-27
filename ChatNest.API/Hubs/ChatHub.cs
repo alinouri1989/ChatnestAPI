@@ -732,7 +732,8 @@ namespace ChatNest.API.Hubs
                     ClientMessageId = removedSession.ClientMessageId,
                     FileName = removedSession.FileName,
                     File = fileBytes,
-                    ReplyToMessageId = removedSession.ReplyToMessageId
+                    ReplyToMessageId = removedSession.ReplyToMessageId,
+                    ThumbnailUrl = ""
                 };
 
                 var (message, chatParticipants) = await _messageService.SendMessageAsync(
@@ -745,14 +746,16 @@ namespace ChatNest.API.Hubs
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
-            }
-            finally
-            {
+
                 if (removedSession.SyncLock.CurrentCount == 0)
                 {
                     removedSession.SyncLock.Release();
                 }
                 removedSession.Dispose();
+            }
+            catch (Exception ex)
+            {
+
             }
         }
 
