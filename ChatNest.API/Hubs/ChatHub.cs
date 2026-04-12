@@ -163,6 +163,7 @@ namespace ChatNest.API.Hubs
                 var safeRecipientIds = chatsRecipientIds ?? new List<string>();
                 var safeGroupIds = userGroupIds ?? new List<string>();
 
+
                 // Get profiles
                 var recipientProfiles = await GetRecipientProfilesSafely(safeRecipientIds);
                 var groupProfiles = await GetGroupProfilesSafely(safeGroupIds);
@@ -175,7 +176,11 @@ namespace ChatNest.API.Hubs
             catch (Exception ex)
             {
                 await SendEmptyDataToClient();
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش بارگذاری اولیه گفتگوها",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -195,7 +200,11 @@ namespace ChatNest.API.Hubs
             catch (Exception ex)
             {
                 await SendEmptyDataToClient();
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش دریافت مجموع گفتگوها",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -216,17 +225,18 @@ namespace ChatNest.API.Hubs
 
                 await Clients.Caller.SendAsync("ReceiveTotalChatMessages", totalChatMessages);
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is NotFoundException || ex is BadRequestException || ex is ForbiddenException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 await SendEmptyDataToClient();
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش شمارش پیام‌های گفتگو",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -249,17 +259,18 @@ namespace ChatNest.API.Hubs
                 var response = new ChatMessagesResponse(total, msgs);
                 await Clients.Caller.SendAsync("ReceiveChatMessages", response);
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is NotFoundException || ex is BadRequestException || ex is ForbiddenException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 await SendEmptyDataToClient();
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش دریافت پیام‌های گفتگو",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -284,17 +295,18 @@ namespace ChatNest.API.Hubs
                 var response = await _messageService.GetChatMessagesByDayAsync(UserId, _chatId, cursorUtc);
                 await Clients.Caller.SendAsync("ReceiveChatMessages", response);
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is NotFoundException || ex is BadRequestException || ex is ForbiddenException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 await SendEmptyDataToClient();
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش دریافت پیام‌ها بر اساس روز",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -469,7 +481,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش ایجاد گفتگو",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -495,7 +511,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش گفتگوی پیام‌های ذخیره‌شده",
+                    errorDetails = ex.Message
+                });
                 return string.Empty;
             }
         }
@@ -526,7 +546,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش پاکسازی گفتگو",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -555,7 +579,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش آرشیو گفتگو",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -584,7 +612,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش خارج‌سازی گفتگو از آرشیو",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -694,6 +726,18 @@ namespace ChatNest.API.Hubs
                     throw new BadRequestException("File size exceeds the allowed limit (200MB)");
                 }
             }
+            catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException || ex is BadRequestException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش ارسال بخش فایل (Chunk Upload)",
+                    errorDetails = ex.Message
+                });
+            }
             finally
             {
                 session.SyncLock.Release();
@@ -753,9 +797,17 @@ namespace ChatNest.API.Hubs
                 }
                 removedSession.Dispose();
             }
+            catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException || ex is BadRequestException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش تکمیل آپلود فایل",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -798,16 +850,17 @@ namespace ChatNest.API.Hubs
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش ارسال پیام",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -834,16 +887,17 @@ namespace ChatNest.API.Hubs
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش تحویل پیام",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -870,16 +924,17 @@ namespace ChatNest.API.Hubs
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش خواندن پیام",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -907,16 +962,17 @@ namespace ChatNest.API.Hubs
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
             }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
+            catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException || ex is BadRequestException)
             {
                 await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش حذف پیام",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -934,7 +990,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام عضویت در گروه خطا رخ داد!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش عضویت در گروه",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -952,7 +1012,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام خروج از گروه خطا رخ داد!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش خروج از گروه",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -974,7 +1038,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام به‌روزرسانی وضعیت خطا رخ داد!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش به‌روزرسانی وضعیت آنلاین",
+                    errorDetails = ex.Message
+                });
             }
         }
 
@@ -999,7 +1067,11 @@ namespace ChatNest.API.Hubs
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "هنگام به‌روزرسانی وضعیت تایپ خطا رخ داد!", errorDetails = ex.Message });
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش وضعیت تایپ کاربر",
+                    errorDetails = ex.Message
+                });
             }
         }
     }

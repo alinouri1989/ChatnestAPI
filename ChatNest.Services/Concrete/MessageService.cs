@@ -253,8 +253,7 @@ namespace ChatNest.Services.Concrete
             var parsedMessageId = ParseRequiredGuid(messageId, "message id");
             var message = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
             if (message == null)
-                throw new NotFoundException("پیام یافت نشد");
-
+                return default;
             var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
                 throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");

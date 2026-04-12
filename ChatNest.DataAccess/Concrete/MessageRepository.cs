@@ -81,9 +81,10 @@ namespace ChatNest.DataAccess.Concrete
 
         public async Task<Message?> GetMessageByIdAsync(Guid messageId)
         {
-            return await _context.Messages
-                .Include(m => m.Sender)
-                .FirstOrDefaultAsync(m => m.Id == messageId && m.Content != DeletedMessageTombstone);
+            var result = await _context.Messages
+                                        .Include(m => m.Sender)
+                                        .FirstOrDefaultAsync(m => m.Id == messageId && m.Content != DeletedMessageTombstone);
+            return result;
         }
 
         public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5)

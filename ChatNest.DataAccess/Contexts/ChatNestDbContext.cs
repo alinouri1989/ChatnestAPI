@@ -91,8 +91,8 @@ namespace ChatNest.DataAccess.Contexts
 
                 entity.Property(e => e.ProfilePhoto)
                       .HasConversion(
-                          v => v.ToString(),
-                          v => new Uri(v));
+                          v => v == null ? null : v.ToString(),
+                          v => string.IsNullOrWhiteSpace(v) ? null : new Uri(v));
 
                 entity.HasMany(u => u.CreatedGroups)
                       .WithOne(g => g.Creator)
@@ -149,8 +149,9 @@ namespace ChatNest.DataAccess.Contexts
 
                 entity.Property(e => e.Photo)
                       .HasConversion(
-                          v => v!.ToString(),
-                          v => new Uri(v));
+                          v => v == null ? null : v.ToString(),
+                          v => string.IsNullOrWhiteSpace(v) ? null : new Uri(v));
+
             });
 
             modelBuilder.Entity<Call>(entity =>

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net9.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
@@ -11,23 +11,23 @@
 		<PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="5.0.17" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.1" />
-		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.19" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.8">
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.14" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.14" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.14">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.8" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.8">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.14" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.14">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="9.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="9.0.8" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.14" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="9.0.14" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.14" />
+		<PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.14" />
+		<PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="9.0.14" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.14" />
 		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
 		<PackageReference Include="Xabe.FFmpeg" Version="6.0.2" />
 	</ItemGroup>
