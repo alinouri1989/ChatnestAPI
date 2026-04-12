@@ -34,10 +34,10 @@ namespace ChatNest.DataAccess.Contexts
                 users = new List<User>() {
                 new User {
                     Id = Guid.NewGuid().ToString(),
-                    UserName = "Admin",
-                    NormalizedUserName = "ADMIN",
-                    Email = "alinouri1989@gmail.com",
-                    NormalizedEmail = "ALINOURI1989@GMAIL.COM",
+                    UserName = "alinouri22",
+                    NormalizedUserName = "alinouri22",
+                    Email = "alinouri22@yahoo.com",
+                    NormalizedEmail = "alinouri22@yahoo.com",
                     LockoutEnabled = false,
                     MobileNo = "09217579859",
                     MobileConfirmed = true,

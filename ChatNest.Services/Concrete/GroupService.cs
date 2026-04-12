@@ -195,6 +195,10 @@ namespace ChatNest.Services.Concrete
 
                 group.Photo = photoUrl;
             }
+            else
+            {
+                group.Photo = null;
+            }
 
             await _groupRepository.CreateOrUpdateGroupAsync(group);
             await SyncGroupChatParticipantsAsync(group.Id, updatedParticipants);
