@@ -133,11 +133,27 @@ namespace ChatNest.Services.Concrete
                     return (result, individualParticipants, userGroupIds);
                 }
 
-                var individualChats = userChats.Where(c => c.ChatType == "Individual")
-                                             .ToDictionary(c => c.Id.ToString(), c => _mapper.Map<ChatDto>(c));
+                var orderedChats = userChats
+                    .OrderByDescending(c =>
+                        c.Messages.Any(m =>
+                            !m.StatusJson.Contains($"\"Read\":{{\"{userId}\":")
+                        )
+                    )
+                    .ThenByDescending(c =>
+                        c.Messages.Any()
+                            ? c.Messages.Max(m => m.CreatedDate)
+                            : c.CreatedDate
+                    )
+                    .ToList();
 
-                var groupChats = userChats.Where(c => c.ChatType == "Group")
-                                         .ToDictionary(c => c.Id.ToString(), c => _mapper.Map<ChatDto>(c));
+                var individualChats = orderedChats
+                    .Where(c => c.ChatType == "Individual")
+                    .ToDictionary(c => c.Id.ToString(), _mapper.Map<ChatDto>);
+
+                var groupChats = orderedChats
+                    .Where(c => c.ChatType == "Group")
+                    .ToDictionary(c => c.Id.ToString(), _mapper.Map<ChatDto>);
+
 
                 // Always add the keys, even if empty
                 if (individualChats.Any())
