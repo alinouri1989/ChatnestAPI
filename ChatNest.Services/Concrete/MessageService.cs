@@ -298,6 +298,7 @@ namespace ChatNest.Services.Concrete
                 return new ChatNest.Shared.DTOs.ChatMessagesPageResponse
                 {
                     ChatId = chatId.ToString(),
+                    ChatType = chat.ChatType,
                     TotalCount = total,
                     Messages = Array.Empty<Message>(),
                     DayStartUtc = null,
@@ -316,6 +317,7 @@ namespace ChatNest.Services.Concrete
             return new ChatNest.Shared.DTOs.ChatMessagesPageResponse
             {
                 ChatId = chatId.ToString(),
+                ChatType = chat.ChatType,
                 TotalCount = total,
                 Messages = messages,
                 DayStartUtc = dayStartUtc,

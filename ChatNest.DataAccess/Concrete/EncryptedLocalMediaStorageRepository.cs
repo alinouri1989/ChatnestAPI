@@ -142,39 +142,36 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
                                                          MemoryStream video,
                                                          string? originalFileName = null)
     {
-        //// ---------- 1️⃣ ذخیرهٔ ویدیو (بدون thumbnail) ----------
-        //var videoUri = await PersistEncryptedAsync(publicId,
-        //                                            folder,
-        //                                            video.ToArray(),
-        //                                            originalFileName,
-        //                                            "video/mp4"
-        //                                            );
+        var videoBytes = video.ToArray();
+        string? thumbFolder = null;
+        string? thumbId = null;
 
-        // ---------- 2️⃣ تولید thumbnail ----------
-        video.Position = 0;                         // بازنشانی استریم
-        var thumbBytes = await CreateThumbnailAsync(video);
-        var thumbFolder = Path.Combine(folder, "thumbnails");
-        var thumbId = $"{publicId}_thumb";
+        try
+        {
+            video.Position = 0;
+            var thumbBytes = await CreateThumbnailAsync(video);
+            thumbFolder = Path.Combine(folder, "thumbnails");
+            thumbId = $"{publicId}_thumb";
 
-        // ---------- 3️⃣ ذخیرهٔ thumbnail (بدون thumbnailUri) ----------
-        await PersistEncryptedAsync(thumbId,
-                                    thumbFolder,
-                                    thumbBytes,
-                                    $"{publicId}_thumb.jpg",
-                                    "image/jpeg");
+            await PersistEncryptedAsync(thumbId,
+                                        thumbFolder,
+                                        thumbBytes,
+                                        $"{publicId}_thumb.jpg",
+                                        "image/jpeg");
+        }
+        catch
+        {
+            thumbFolder = null;
+            thumbId = null;
+        }
 
-        // ---------- 4️⃣ به‌روزرسانی متادیتای ویدیو با URI تصویر کوچک ----------
-        // این فراخوانی فقط برای نوشتن متادیتای جدید (ThumbnailUri) انجام می‌شود.
-        var uris = await PersistEncryptedAsync(publicId,
-                                      folder,
-                                      video.ToArray(),
-                                      originalFileName,
-                                      "video/mp4",
-                                      thumbFolder,
-                                      thumbId);
-
-        // مسیر عمومی ویدیو را برمی‌گردانیم
-        return new(uris.Item1, uris.Item2);
+        return await PersistEncryptedAsync(publicId,
+                                           folder,
+                                           videoBytes,
+                                           originalFileName,
+                                           "video/mp4",
+                                           thumbFolder,
+                                           thumbId);
     }
 
     #endregion
@@ -387,9 +384,11 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
             ".gif" => "image/gif",
             ".webp" => "image/webp",
             ".svg" => "image/svg+xml",
+            ".apk" => "application/vnd.android.package-archive",
             ".mp4" => "video/mp4",
             ".webm" => "video/webm",
             ".mov" => "video/quicktime",
+            ".mkv" => "video/x-matroska",
             ".mp3" => "audio/mpeg",
             ".wav" => "audio/wav",
             ".ogg" => "audio/ogg",

@@ -1,6 +1,7 @@
 using ChatNest.DataAccess.Abstract;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace ChatNest.API.Controllers;
 
@@ -28,6 +29,16 @@ public sealed class MediaController : ControllerBase
         Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
         Response.Headers.Pragma = "no-cache";
         Response.Headers.Expires = "0";
+        Response.Headers.ContentType = mediaFile.ContentType;
+        if (!string.IsNullOrWhiteSpace(mediaFile.OriginalFileName))
+        {
+            var contentDisposition = new ContentDispositionHeaderValue("attachment")
+            {
+                FileName = mediaFile.OriginalFileName,
+                FileNameStar = mediaFile.OriginalFileName
+            };
+            Response.Headers.ContentDisposition = contentDisposition.ToString();
+        }
 
         return new FileContentResult(mediaFile.Content, mediaFile.ContentType)
         {
