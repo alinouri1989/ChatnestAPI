@@ -11,6 +11,7 @@ using ChatNest.Services.Abstract;
 using ChatNest.Services.Concrete;
 using ChatNest.Services.Mapping;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
@@ -51,6 +52,7 @@ try
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 60,
             shared: true));
+
     FFmpeg.SetExecutablesPath(builder.Configuration["FileStorage:PathFFmpeg"]);
 
     // Add DbContext
@@ -72,11 +74,21 @@ try
         options.User.RequireUniqueEmail = true;
         options.SignIn.RequireConfirmedEmail = false;
     })
-                .AddRoles<Role>()
-                .AddRoleManager<RoleManager<Role>>()
-                .AddRoleValidator<RoleValidator<Role>>()
-                .AddEntityFrameworkStores<ChatNestDbContext>()
-                .AddDefaultTokenProviders();
+    .AddRoles<Role>()
+    .AddRoleManager<RoleManager<Role>>()
+    .AddRoleValidator<RoleValidator<Role>>()
+    .AddEntityFrameworkStores<ChatNestDbContext>()
+    .AddDefaultTokenProviders();
+
+    // Configure Data Protection keys
+    var dataProtectionKeysPath =
+        builder.Configuration["DataProtection:KeysPath"]
+        ?? "/www/wwwroot/Api/keys";
+
+    builder.Services
+        .AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+        .SetApplicationName("ChatNest");
 
     // Configure encrypted local file storage
     builder.Services.AddSingleton<FileStorageConfig>(provider =>
@@ -144,6 +156,7 @@ try
                 {
                     context.Token = accessToken;
                 }
+
                 return Task.CompletedTask;
             }
         };
@@ -179,6 +192,8 @@ try
 
     // Add AutoMapper
     builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+    // SignalR services
     builder.Services.AddSingleton<IUserIdProvider, SubClaimUserIdProvider>();
     builder.Services.AddSingleton<IUserPresenceTracker, UserPresenceTracker>();
 
@@ -199,10 +214,12 @@ try
 
     var redisEnabled = builder.Configuration.GetValue<bool>("Redis:Enabled");
     var redisConnection = builder.Configuration["Redis:ConnectionString"];
+
     if (string.IsNullOrWhiteSpace(redisConnection))
     {
         var redisHost = builder.Configuration["Redis:Hosts:0:Host"];
         var redisPort = builder.Configuration["Redis:Hosts:0:Port"] ?? "6379";
+
         if (!string.IsNullOrWhiteSpace(redisHost))
         {
             redisConnection = $"{redisHost}:{redisPort},abortConnect=false,connectTimeout=5000,syncTimeout=5000";
@@ -217,12 +234,11 @@ try
         });
     }
 
-
     // Add Controllers
     builder.Services.AddControllers();
 
+    // CORS
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
-    var allowedMethods = builder.Configuration.GetSection("Cors:AllowedMethods").Get<string[]>() ?? Array.Empty<string>();
     var allowedHeaders = builder.Configuration.GetSection("Cors:AllowedHeaders").Get<string[]>() ?? Array.Empty<string>();
     var allowCredentials = builder.Configuration.GetValue<bool>("Cors:AllowCredentials");
 
@@ -235,14 +251,18 @@ try
                   .WithHeaders(allowedHeaders.Length > 0 ? allowedHeaders : ["Content-Type", "Authorization"])
                   .SetPreflightMaxAge(TimeSpan.FromHours(1))
                   .SetIsOriginAllowedToAllowWildcardSubdomains();
-            if (allowCredentials) policy.AllowCredentials();
 
+            if (allowCredentials)
+            {
+                policy.AllowCredentials();
+            }
         });
     });
 
-    // Add Swagger for development
+    // Add Swagger
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
+
     var app = builder.Build();
 
     await app.Services.SeedIdentityDataAsync();
@@ -268,6 +288,7 @@ try
             errorApp.Run(async context =>
             {
                 var exceptionFeature = context.Features.Get<IExceptionHandlerFeature>();
+
                 if (exceptionFeature?.Error is not null)
                 {
                     Log.Error(exceptionFeature.Error, "Unhandled exception for {Path}", context.Request.Path);
@@ -275,30 +296,21 @@ try
 
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new { message = "خطای داخلی سرور" });
+
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    message = "خطای داخلی سرور"
+                });
             });
         });
     }
-
-    //app.UseHttpsRedirection();
-    //app.UseStaticFiles();
-    //app.UseRouting();
-    //app.UseCors("_myAllowSpecificOrigins");
-    //app.UseAuthentication();
-    //app.UseAuthorization();
-
-    //app.MapControllers();
-
-    //app.MapHub<ChatHub>("hub/Chat");
-    //app.MapHub<CallHub>("hub/Call");
-    //app.MapHub<NotificationHub>("hub/Notification");
 
     app.UseHttpsRedirection();
     app.UseStaticFiles();
 
     app.UseRouting();
 
-    app.UseCors("_myAllowSpecificOrigins");  // ✅ بعد از Routing
+    app.UseCors("_myAllowSpecificOrigins");
 
     app.UseAuthentication();
     app.UseAuthorization();
