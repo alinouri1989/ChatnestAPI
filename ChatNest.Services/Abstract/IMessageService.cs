@@ -19,6 +19,15 @@ namespace ChatNest.Services.Abstract
         Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(string userId, string chatId, string chatType, SendMessage dto);
 
         /// <summary>
+        /// فوروارد کردن یک پیوست موجود به گفتگوی دیگر، بدون آپلود دوباره فایل.
+        /// </summary>
+        Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> ForwardAttachmentAsync(
+            string userId,
+            string sourceMessageId,
+            string targetChatId,
+            string targetChatType);
+
+        /// <summary>
         /// یک پیام را حذف می‌کند.
         /// </summary>
         /// <param name="userId">شناسه کاربری که پیام را حذف می‌کند.</param>

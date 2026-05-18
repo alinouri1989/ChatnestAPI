@@ -865,6 +865,76 @@ namespace ChatNest.API.Hubs
         }
 
         /// <summary>
+        /// فوروارد کردن یک پیوست موجود به گفتگوی دیگر بدون آپلود مجدد فایل.
+        /// </summary>
+        public async Task ForwardAttachment(string targetChatType, string targetChatId, string sourceMessageId)
+        {
+            try
+            {
+                var (message, chatParticipants) = await _messageService.ForwardAttachmentAsync(
+                    UserId,
+                    sourceMessageId,
+                    targetChatId,
+                    targetChatType);
+
+                foreach (var participant in chatParticipants)
+                {
+                    await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
+                }
+            }
+            catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش فوروارد فایل",
+                    errorDetails = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// فوروارد کردن پیوست به یک کاربر؛ اگر گفتگوی شخصی وجود نداشته باشد ابتدا ساخته می‌شود.
+        /// </summary>
+        public async Task ForwardAttachmentToUser(string recipientId, string sourceMessageId)
+        {
+            try
+            {
+                var chat = await _chatService.CreateChatAsync(UserId, "Individual", recipientId);
+                var targetChatId = await BroadcastIndividualChatAsync(chat);
+
+                if (string.IsNullOrWhiteSpace(targetChatId))
+                    throw new BadRequestException("Target chat could not be resolved");
+
+                var (message, chatParticipants) = await _messageService.ForwardAttachmentAsync(
+                    UserId,
+                    sourceMessageId,
+                    targetChatId,
+                    "Individual");
+
+                foreach (var participant in chatParticipants)
+                {
+                    await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
+                }
+            }
+            catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new
+                {
+                    message = "خطای غیرمنتظره در بخش فوروارد فایل به کاربر",
+                    errorDetails = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
         /// تحویل یک پیام را علامت‌گذاری می‌کند و به شرکت‌کنندگان گفتگو اطلاع می‌دهد.
         /// </summary>
         /// <param name="chatType">نوع گفتگو ("Individual" یا "Group").</param>

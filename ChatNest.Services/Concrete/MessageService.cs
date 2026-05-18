@@ -53,13 +53,16 @@ namespace ChatNest.Services.Concrete
             throw new BadRequestException($"Invalid {parameterName}");
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(
-            string userId, string chatId, string chatType, SendMessage dto)
+        private async Task<Chat> GetWritableChatAsync(string userId, string chatId, string chatType)
         {
             var parsedChatId = ParseRequiredGuid(chatId, "chat id");
             var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
+
             if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
                 throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");
+
+            if (!string.Equals(chat.ChatType, chatType, StringComparison.OrdinalIgnoreCase))
+                throw new BadRequestException("Chat type does not match target chat");
 
             if (chatType.Equals("Group", StringComparison.OrdinalIgnoreCase))
             {
@@ -75,6 +78,15 @@ namespace ChatNest.Services.Concrete
                         throw new ForbiddenException("فقط مدیران کانال دسترسی ارسال پیام دارند");
                 }
             }
+
+            return chat;
+        }
+
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(
+            string userId, string chatId, string chatType, SendMessage dto)
+        {
+            var chat = await GetWritableChatAsync(userId, chatId, chatType);
+            var parsedChatId = chat.Id;
 
             Guid? replyToMessageId = null;
             Message? referencedMessage = null;
@@ -182,6 +194,73 @@ namespace ChatNest.Services.Concrete
             };
 
             return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
+        }
+
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> ForwardAttachmentAsync(
+            string userId,
+            string sourceMessageId,
+            string targetChatId,
+            string targetChatType)
+        {
+            var parsedSourceMessageId = ParseRequiredGuid(sourceMessageId, "source message id");
+            var sourceMessage = await _messageRepository.GetMessageByIdAsync(parsedSourceMessageId);
+            if (sourceMessage == null)
+                throw new NotFoundException("پیام مبدا یافت نشد");
+
+            var sourceChat = await _chatRepository.GetChatByIdAsync(sourceMessage.ChatId);
+            if (sourceChat == null || !sourceChat.ChatParticipants.Any(u => u.UserId == userId))
+                throw new NotFoundException("به پیام مبدا دسترسی ندارید");
+
+            if (sourceMessage.DeletedFor.ContainsKey(userId))
+                throw new NotFoundException("پیام مبدا در دسترس نیست");
+
+            if (sourceMessage.Type == MessageContent.Text)
+                throw new BadRequestException("Only attachments can be forwarded");
+
+            if (string.IsNullOrWhiteSpace(sourceMessage.Content))
+                throw new BadRequestException("Attachment content is unavailable");
+
+            var targetChat = await GetWritableChatAsync(userId, targetChatId, targetChatType);
+
+            var forwardedMessage = new Message
+            {
+                Id = Guid.NewGuid(),
+                SenderId = userId,
+                ChatId = targetChat.Id,
+                Content = sourceMessage.Content,
+                Type = sourceMessage.Type,
+                ThumbnailUrl = sourceMessage.ThumbnailUrl,
+                FileName = sourceMessage.FileName,
+                FileSize = sourceMessage.FileSize,
+                CreatedDate = DateTime.UtcNow,
+                Status = new MessageStatus
+                {
+                    Sent = new Dictionary<string, DateTime> { { userId, DateTime.UtcNow } },
+                    Delivered = new Dictionary<string, DateTime>(),
+                    Read = new Dictionary<string, DateTime>()
+                }
+            };
+
+            await _messageRepository.CreateMessageAsync(forwardedMessage);
+
+            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
+            {
+                {
+                    targetChatType,
+                    new Dictionary<string, Dictionary<string, Message>>
+                    {
+                        {
+                            targetChatId,
+                            new Dictionary<string, Message>
+                            {
+                                { forwardedMessage.Id.ToString(), forwardedMessage }
+                            }
+                        }
+                    }
+                }
+            };
+
+            return (result, targetChat.ChatParticipants.Select(c => c.UserId).ToList());
         }
 
         public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(
