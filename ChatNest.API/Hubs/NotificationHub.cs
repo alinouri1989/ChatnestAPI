@@ -63,11 +63,9 @@ namespace ChatNest.API.Hubs
                 var becameOnline = _presenceTracker.AddConnection(UserId, Context.ConnectionId);
                 if (becameOnline)
                 {
-                    var onlineMarker = DateTime.MinValue;
-                    await _userService.UpdateLastConnectionDateAsync(UserId, onlineMarker);
-                    await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
+                    await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>>
                     {
-                        { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", onlineMarker } } }
+                        { UserId, new Dictionary<string, object> { { "isOnline", true } } }
                     });
                 }
             }
@@ -93,9 +91,16 @@ namespace ChatNest.API.Hubs
                     DateTime lastConnectionDate = DateTime.UtcNow;
                     await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
 
-                    await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, DateTime>>
+                    await Clients.Others.SendAsync("ReceiveRecipientProfiles", new Dictionary<string, Dictionary<string, object>>
                     {
-                        { UserId, new Dictionary<string, DateTime> { { "lastConnectionDate", lastConnectionDate } } }
+                        {
+                            UserId,
+                            new Dictionary<string, object>
+                            {
+                                { "isOnline", false },
+                                { "lastConnectionDate", lastConnectionDate }
+                            }
+                        }
                     });
                 }
             }

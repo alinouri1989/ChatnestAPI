@@ -10,5 +10,7 @@
         public required Uri ProfilePhoto { get; init; }
 
         public required DateTime LastConnectionDate { get; set; }
+
+        public bool IsOnline { get; set; }
     }
 }

@@ -16,6 +16,7 @@ namespace ChatNest.API.Hubs
     {
         private readonly IUserService _userService;
         private readonly ICallService _callService;
+        private readonly IUserPresenceTracker _presenceTracker;
 
         /// <summary>
         /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
@@ -45,10 +46,22 @@ namespace ChatNest.API.Hubs
         /// </summary>
         /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
         /// <param name="callService">وابستگی <see cref="ICallService"/> برای عملیات تماس.</param>
-        public CallHub(IUserService userService, ICallService callService)
+        public CallHub(
+            IUserService userService,
+            ICallService callService,
+            IUserPresenceTracker presenceTracker)
         {
             _userService = userService;
             _callService = callService;
+            _presenceTracker = presenceTracker;
+        }
+
+        private void ApplyPresenceState(Dictionary<string, ChatNest.Shared.DTOs.Response.CallerUser> profiles)
+        {
+            foreach (var (userId, profile) in profiles)
+            {
+                profile.IsOnline = _presenceTracker.IsOnline(userId);
+            }
         }
 
         /// <summary>
@@ -89,6 +102,7 @@ namespace ChatNest.API.Hubs
                             var endCall = await _callService.EndCallAsync(UserId, call.Key, CallStatus.Accepted, DateTime.UtcNow);
                             var callParticipants = await _callService.GetCallParticipantsAsync(UserId, call.Key);
                             var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
+                            ApplyPresenceState(recipientProfiles);
 
                             foreach (var participant in callParticipants)
                             {
@@ -136,6 +150,7 @@ namespace ChatNest.API.Hubs
             {
                 var (calls, callRecipientIds) = await _callService.GetCallLogsAsync(UserId);
                 var recipientProfiles = await _userService.GetUserProfilesAsync(callRecipientIds);
+                ApplyPresenceState(recipientProfiles);
 
                 await Clients.Caller.SendAsync("ReceiveInitialCalls", calls);
                 await Clients.Caller.SendAsync("ReceiveInitialCallRecipientProfiles", recipientProfiles);
@@ -163,6 +178,7 @@ namespace ChatNest.API.Hubs
                 var callId = await _callService.StartCallAsync(UserId, recipientId, callType);
                 List<string> callParticipants = [UserId, recipientId];
                 var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
+                ApplyPresenceState(recipientProfiles);
 
                 await Clients.User(UserId).SendAsync("ReceiveOutgoingCall", new Dictionary<string, object>
                 {

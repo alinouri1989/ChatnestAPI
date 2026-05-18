@@ -4,6 +4,7 @@ using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
+using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
@@ -23,6 +24,7 @@ namespace ChatNest.API.Hubs
         private readonly IGroupService _groupService;
         private readonly IChatService _chatService;
         private readonly IUserService _userService;
+        private readonly IUserPresenceTracker _presenceTracker;
         private readonly IMapper _mapper;
 
         private static readonly ConcurrentDictionary<string, PendingUploadSession> PendingUploads = new();
@@ -100,12 +102,19 @@ namespace ChatNest.API.Hubs
         /// <param name="groupService">وابستگی <see cref="IGroupService"/> برای عملیات گروه.</param>
         /// <param name="chatService">وابستگی <see cref="IChatService"/> برای عملیات گفتگو.</param>
         /// <param name="userService">وابستگی <see cref="IUserService"/> برای عملیات کاربر.</param>
-        public ChatHub(IMessageService messageService, IGroupService groupService, IChatService chatService, IUserService userService, IMapper mapper)
+        public ChatHub(
+            IMessageService messageService,
+            IGroupService groupService,
+            IChatService chatService,
+            IUserService userService,
+            IUserPresenceTracker presenceTracker,
+            IMapper mapper)
         {
             _messageService = messageService;
             _groupService = groupService;
             _chatService = chatService;
             _userService = userService;
+            _presenceTracker = presenceTracker;
             _mapper = mapper;
         }
 
@@ -363,33 +372,58 @@ namespace ChatNest.API.Hubs
                 };
         }
 
-        private async Task<Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>> GetRecipientProfilesSafely(List<string> recipientIds)
+        private void ApplyPresenceState(Dictionary<string, RecipientProfile> profiles)
+        {
+            foreach (var (userId, profile) in profiles)
+            {
+                profile.IsOnline = _presenceTracker.IsOnline(userId);
+            }
+        }
+
+        private void ApplyPresenceState(Dictionary<string, GroupProfile> profiles)
+        {
+            foreach (var profile in profiles.Values)
+            {
+                foreach (var participant in profile.Participants.Values)
+                {
+                    participant.IsOnline = _presenceTracker.IsOnline(participant.UserId);
+                }
+            }
+        }
+
+        private async Task<Dictionary<string, RecipientProfile>> GetRecipientProfilesSafely(List<string> recipientIds)
         {
             try
             {
-                return recipientIds.Any()
+                var profiles = recipientIds.Any()
                     ? await _userService.GetRecipientProfilesAsync(recipientIds)
-                    : new Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>();
+                    : new Dictionary<string, RecipientProfile>();
+
+                ApplyPresenceState(profiles);
+                return profiles;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting recipient profiles: {ex.Message}");
-                return new Dictionary<string, ChatNest.Shared.DTOs.Response.RecipientProfile>();
+                return new Dictionary<string, RecipientProfile>();
             }
         }
 
-        private async Task<Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>> GetGroupProfilesSafely(List<string> groupIds)
+        private async Task<Dictionary<string, GroupProfile>> GetGroupProfilesSafely(List<string> groupIds)
         {
             try
             {
-                return groupIds.Any()
+                var profiles = groupIds.Any()
                     ? await _groupService.GetGroupProfilesAsync(groupIds)
-                    : new Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>();
+                    : new Dictionary<string, GroupProfile>();
+
+                ApplyPresenceState(profiles);
+                return profiles;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting group profiles: {ex.Message}");
-                return new Dictionary<string, ChatNest.Shared.DTOs.Response.GroupProfile>();
+                return new Dictionary<string, GroupProfile>();
             }
         }
 
@@ -422,6 +456,7 @@ namespace ChatNest.API.Hubs
             }
 
             var recipientProfiles = await _userService.GetRecipientProfilesAsync(chatParticipants);
+            ApplyPresenceState(recipientProfiles);
             foreach (var participant in chatParticipants)
             {
                 var profileUserId = chatParticipants.FirstOrDefault(p => p != participant) ?? participant;
@@ -1099,12 +1134,26 @@ namespace ChatNest.API.Hubs
         {
             try
             {
-                var lastConnectionDate = isOnline ? DateTime.MinValue : DateTime.UtcNow;
-                await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
+                _ = isOnline;
+                var actualIsOnline = _presenceTracker.IsOnline(UserId);
+                var updates = new Dictionary<string, object>
+                {
+                    { "isOnline", actualIsOnline }
+                };
 
-                // Notify all contacts about the status change
-                // This would require getting user's contacts first
-                await Clients.Others.SendAsync("UserStatusChanged", new { userId = UserId, isOnline, lastSeen = DateTime.UtcNow });
+                if (!actualIsOnline)
+                {
+                    var lastConnectionDate = DateTime.UtcNow;
+                    await _userService.UpdateLastConnectionDateAsync(UserId, lastConnectionDate);
+                    updates["lastConnectionDate"] = lastConnectionDate;
+                }
+
+                await Clients.Others.SendAsync(
+                    "ReceiveRecipientProfiles",
+                    new Dictionary<string, Dictionary<string, object>>
+                    {
+                        { UserId, updates }
+                    });
             }
             catch (Exception ex)
             {
@@ -1128,12 +1177,18 @@ namespace ChatNest.API.Hubs
             {
                 // Get chat participants to notify them
                 var chatParticipants = await _chatService.GetChatParticipantsAsync(chatId);
+                if (!chatParticipants.Contains(UserId))
+                    throw new NotFoundException("Chat not found or access denied");
 
                 var otherParticipants = chatParticipants.Where(p => p != UserId);
                 foreach (var participant in otherParticipants)
                 {
                     await Clients.User(participant).SendAsync("UserTyping", new { chatId, userId = UserId, isTyping });
                 }
+            }
+            catch (Exception ex) when (ex is NotFoundException || ex is BadRequestException || ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
             }
             catch (Exception ex)
             {

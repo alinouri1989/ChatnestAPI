@@ -110,6 +110,7 @@ namespace ChatNest.Services.Concrete
 
                     // ✅ required member باید همینجا ست بشه
                     ProfilePhoto = user?.ProfilePhoto?.ToString() ?? "",
+                    LastConnectionDate = user?.LastConnectionDate,
 
                     Role = role
                 };

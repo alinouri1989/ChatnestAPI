@@ -18,5 +18,7 @@ namespace ChatNest.Shared.DTOs.Response
         public required string ProfilePhoto { get; init; }
 
         public DateTime LastConnectionDate { get; set; }
+
+        public bool IsOnline { get; set; }
     }
 }
