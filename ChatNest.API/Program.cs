@@ -191,8 +191,10 @@ try
     builder.Services.AddHttpClient();
 
     // Add AutoMapper
-    builder.Services.AddAutoMapper(typeof(MappingProfile));
-
+    builder.Services.AddAutoMapper(
+        cfg => { },
+        typeof(MappingProfile)
+    );
     // SignalR services
     builder.Services.AddSingleton<IUserIdProvider, SubClaimUserIdProvider>();
     builder.Services.AddSingleton<IUserPresenceTracker, UserPresenceTracker>();

@@ -349,6 +349,66 @@ namespace ChatNest.API.Hubs
             }
         }
 
+        public async Task SendSdp(string callId, JsonElement sdp)
+        {
+            try
+            {
+                var call = await _callService.GetCallAsync(UserId, callId);
+                var callParticipants = await _callService.GetCallParticipantsAsync(UserId, callId);
+
+                foreach (var participant in callParticipants.Where(participant => participant != UserId))
+                {
+                    await Clients.User(participant).SendAsync("ReceiveSdp", new
+                    {
+                        callId,
+                        sdp,
+                        callType = (int)call.Type,
+                        senderId = UserId
+                    });
+                }
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در ارسال داده تماس رخ داد!", errorDetails = ex.Message });
+            }
+        }
+
+        public async Task SendIceCandidate(string callId, JsonElement iceCandidate)
+        {
+            try
+            {
+                var callParticipants = await _callService.GetCallParticipantsAsync(UserId, callId);
+
+                foreach (var participant in callParticipants.Where(participant => participant != UserId))
+                {
+                    await Clients.User(participant).SendAsync("ReceiveIceCandidate", new
+                    {
+                        callId,
+                        iceCandidate,
+                        senderId = UserId
+                    });
+                }
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در ارسال کاندید تماس رخ داد!", errorDetails = ex.Message });
+            }
+        }
+
         /// <summary>
         /// تماس مشخص شده را پایان می‌دهد و به تمام شرکت‌کنندگان اطلاع پایان تماس را ارسال می‌کند.
         /// </summary>

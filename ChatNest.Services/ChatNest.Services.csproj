@@ -1,20 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\ChatNest.Core\ChatNest.Core.csproj" />
-    <ProjectReference Include="..\ChatNest.DataAccess\ChatNest.DataAccess.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\ChatNest.Core\ChatNest.Core.csproj" />
+		<ProjectReference Include="..\ChatNest.DataAccess\ChatNest.DataAccess.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-	  <PackageReference Include="AutoMapper" Version="14.0.0" />
-	  <PackageReference Include="MailKit" Version="4.17.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="AutoMapper" Version="16.1.1" />
+		<PackageReference Include="MailKit" Version="4.17.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.8" />
+	</ItemGroup>
 
 </Project>
