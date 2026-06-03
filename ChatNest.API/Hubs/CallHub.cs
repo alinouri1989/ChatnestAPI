@@ -3,13 +3,17 @@ using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
+using System.Text.Json;
 
 namespace ChatNest.API.Hubs
 {
     /// <summary>
     /// کلاس هاب SignalR برای مدیریت عملیات تماس در زمان واقعی.
-    /// اتصالات کاربر، شروع تماس، پایان تماس و عملیات سیگنالینگ WebRTC را مدیریت می‌کند.
+    /// اتصالات کاربر، شروع تماس، پایان تماس و صدور توکن LiveKit را مدیریت می‌کند.
     /// </summary>
     [Authorize]
     public sealed class CallHub : Hub
@@ -17,6 +21,7 @@ namespace ChatNest.API.Hubs
         private readonly IUserService _userService;
         private readonly ICallService _callService;
         private readonly IUserPresenceTracker _presenceTracker;
+        private readonly IConfiguration _configuration;
 
         /// <summary>
         /// شناسه کاربر فعلی (UserId) را برمی‌گرداند.
@@ -49,11 +54,13 @@ namespace ChatNest.API.Hubs
         public CallHub(
             IUserService userService,
             ICallService callService,
-            IUserPresenceTracker presenceTracker)
+            IUserPresenceTracker presenceTracker,
+            IConfiguration configuration)
         {
             _userService = userService;
             _callService = callService;
             _presenceTracker = presenceTracker;
+            _configuration = configuration;
         }
 
         private void ApplyPresenceState(Dictionary<string, ChatNest.Shared.DTOs.Response.CallerUser> profiles)
@@ -61,6 +68,18 @@ namespace ChatNest.API.Hubs
             foreach (var (userId, profile) in profiles)
             {
                 profile.IsOnline = _presenceTracker.IsOnline(userId);
+            }
+        }
+
+        private async Task SendCallerErrorAsync(string eventName, string message, string? errorDetails = null)
+        {
+            try
+            {
+                await Clients.Caller.SendAsync(eventName, new { message, errorDetails });
+            }
+            catch
+            {
+                // Avoid converting an error notification failure into a hub invocation exception.
             }
         }
 
@@ -171,31 +190,42 @@ namespace ChatNest.API.Hubs
         /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
         /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به شروع تماس نباشد پرتاب می‌شود.</exception>
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
-        public async Task StartCall(string recipientId, CallType callType)
+        public async Task StartCall(string recipientId, int callType)
         {
             try
             {
-                var callId = await _callService.StartCallAsync(UserId, recipientId, callType);
+                if (!Enum.IsDefined(typeof(CallType), callType))
+                {
+                    throw new BadRequestException("Invalid call type");
+                }
+
+                var parsedCallType = (CallType)callType;
+                var callId = await _callService.StartCallAsync(UserId, recipientId, parsedCallType);
                 List<string> callParticipants = [UserId, recipientId];
                 var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
                 ApplyPresenceState(recipientProfiles);
 
-                await Clients.User(UserId).SendAsync("ReceiveOutgoingCall", new Dictionary<string, object>
+                recipientProfiles.TryGetValue(recipientId, out var recipientProfile);
+                recipientProfiles.TryGetValue(UserId, out var callerProfile);
+
+                await Clients.User(UserId).SendAsync("ReceiveOutgoingCall", new
                 {
-                    { "callId", callId },
-                    { "callType", callType },
-                    { "callerId", UserId },
-                    { "recipientId", recipientId },
-                    { recipientId, recipientProfiles.ContainsKey(recipientId) ? recipientProfiles[recipientId] : null }
+                    callId,
+                    callType = (int)parsedCallType,
+                    callerId = UserId,
+                    recipientId,
+                    profileUserId = recipientId,
+                    profile = recipientProfile
                 });
 
-                await Clients.User(recipientId).SendAsync("ReceiveIncomingCall", new Dictionary<string, object>
+                await Clients.User(recipientId).SendAsync("ReceiveIncomingCall", new
                 {
-                    { "callId", callId },
-                    { "callType", callType },
-                    { "callerId", UserId },
-                    { "recipientId", recipientId },
-                    { UserId, recipientProfiles.ContainsKey(UserId) ? recipientProfiles[UserId] : null }
+                    callId,
+                    callType = (int)parsedCallType,
+                    callerId = UserId,
+                    recipientId,
+                    profileUserId = UserId,
+                    profile = callerProfile
                 });
             }
             catch (Exception ex) when (
@@ -203,11 +233,11 @@ namespace ChatNest.API.Hubs
                 ex is BadRequestException ||
                 ex is ForbiddenException)
             {
-                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+                await SendCallerErrorAsync("ValidationError", ex.Message);
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در شروع تماس رخ داد!", errorDetails = ex.Message });
+                await SendCallerErrorAsync("UnexpectedError", "خطای غیرمنتظره‌ای در شروع تماس رخ داد!", ex.Message);
             }
         }
 
@@ -240,6 +270,85 @@ namespace ChatNest.API.Hubs
             }
         }
 
+        public async Task<object> CreateLiveKitJoinToken(string callId, string? displayName)
+        {
+            try
+            {
+                var call = await _callService.GetCallAsync(UserId, callId);
+                var participants = await _callService.GetCallParticipantsAsync(UserId, callId);
+
+                var serverUrl = _configuration["LiveKit:ServerUrl"];
+                var apiKey = _configuration["LiveKit:ApiKey"];
+                var apiSecret = _configuration["LiveKit:ApiSecret"];
+                var roomPrefix = _configuration["LiveKit:RoomPrefix"] ?? "chatnest-call";
+                var ttlMinutes = _configuration.GetValue<int?>("LiveKit:TokenTtlMinutes") ?? 30;
+
+                if (string.IsNullOrWhiteSpace(serverUrl) ||
+                    string.IsNullOrWhiteSpace(apiKey) ||
+                    string.IsNullOrWhiteSpace(apiSecret))
+                {
+                    throw new InvalidOperationException("LiveKit configuration is incomplete.");
+                }
+
+                var now = DateTimeOffset.UtcNow;
+                var expires = now.AddMinutes(ttlMinutes <= 0 ? 30 : ttlMinutes);
+                var roomName = $"{roomPrefix}-{call.Id:N}";
+                var identity = $"chatnest-{UserId}";
+                var videoGrant = new Dictionary<string, object>
+                {
+                    ["roomJoin"] = true,
+                    ["room"] = roomName,
+                    ["canPublish"] = true,
+                    ["canSubscribe"] = true,
+                    ["canPublishData"] = true,
+                    ["canUpdateOwnMetadata"] = true
+                };
+
+                var metadata = new
+                {
+                    callId = call.Id,
+                    callType = call.Type.ToString(),
+                    userId = UserId,
+                    participants
+                };
+
+                var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(apiSecret));
+                var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+                var payload = new JwtPayload
+                {
+                    ["iss"] = apiKey,
+                    ["sub"] = identity,
+                    ["name"] = string.IsNullOrWhiteSpace(displayName) ? identity : displayName,
+                    ["metadata"] = JsonSerializer.Serialize(metadata),
+                    ["nbf"] = now.ToUnixTimeSeconds(),
+                    ["exp"] = expires.ToUnixTimeSeconds(),
+                    ["video"] = videoGrant
+                };
+
+                var token = new JwtSecurityToken(new JwtHeader(credentials), payload);
+
+                return new
+                {
+                    serverUrl,
+                    token = new JwtSecurityTokenHandler().WriteToken(token),
+                    roomName,
+                    identity,
+                    expiresAt = expires.UtcDateTime,
+                    callId = call.Id,
+                    callType = call.Type
+                };
+            }
+            catch (Exception ex) when (
+                ex is NotFoundException ||
+                ex is BadRequestException ||
+                ex is ForbiddenException ||
+                ex is InvalidOperationException)
+            {
+                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
+                throw;
+            }
+        }
+
         /// <summary>
         /// تماس مشخص شده را پایان می‌دهد و به تمام شرکت‌کنندگان اطلاع پایان تماس را ارسال می‌کند.
         /// </summary>
@@ -251,11 +360,16 @@ namespace ChatNest.API.Hubs
         /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
         /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به پایان دادن تماس نباشد پرتاب می‌شود.</exception>
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
-        public async Task EndCall(string callId, CallStatus callStatus, DateTime? createdDate)
+        public async Task EndCall(string callId, int callStatus, DateTime? createdDate)
         {
             try
             {
-                var call = await _callService.EndCallAsync(UserId, callId, callStatus, createdDate);
+                if (!Enum.IsDefined(typeof(CallStatus), callStatus))
+                {
+                    throw new BadRequestException("Invalid call status");
+                }
+
+                var call = await _callService.EndCallAsync(UserId, callId, (CallStatus)callStatus, createdDate);
                 var callParticipants = await _callService.GetCallParticipantsAsync(UserId, callId);
                 var recipientProfiles = await _userService.GetUserProfilesAsync(callParticipants);
 
@@ -320,88 +434,5 @@ namespace ChatNest.API.Hubs
             }
         }
 
-        /// <summary>
-        /// اطلاعات SDP (Session Description Protocol) را برای اتصال WebRTC به شرکت‌کننده دیگر تماس ارسال می‌کند.
-        /// </summary>
-        /// <param name="callId">شناسه تماسی که اطلاعات SDP برای آن ارسال می‌شود.</param>
-        /// <param name="sdp">شیء SDP که باید ارسال شود.</param>
-        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
-        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
-        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
-        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
-        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
-        public async Task SendSdp(string callId, object sdp)
-        {
-            try
-            {
-                var call = await _callService.GetCallAsync(UserId, callId);
-                var participants = await _callService.GetCallParticipantsAsync(UserId, callId);
-
-                foreach (var participant in participants)
-                {
-                    if (!participant.Equals(UserId))
-                    {
-                        await Clients.User(participant).SendAsync("ReceiveSdp", new Dictionary<string, object>
-                        {
-                            {"callId", callId },
-                            {"sdp", sdp },
-                            {"callType", call.Type }
-                        });
-                    }
-                }
-            }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
-            {
-                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در ارسال SDP رخ داد!", errorDetails = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// نامزدهای ICE (Interactive Connectivity Establishment) را برای اتصال WebRTC به شرکت‌کننده دیگر تماس ارسال می‌کند.
-        /// </summary>
-        /// <param name="callId">شناسه تماسی که نامزد ICE برای آن ارسال می‌شود.</param>
-        /// <param name="iceCandidate">شیء نامزد ICE که باید ارسال شود.</param>
-        /// <returns>یک شیء <see cref="Task"/> برمی‌گرداند.</returns>
-        /// <exception cref="NotFoundException">در صورت یافت نشدن تماس پرتاب می‌شود.</exception>
-        /// <exception cref="BadRequestException">در صورت ارائه پارامترهای نامعتبر پرتاب می‌شود.</exception>
-        /// <exception cref="ForbiddenException">در صورتی که کاربر مجاز به انجام این عملیات نباشد پرتاب می‌شود.</exception>
-        /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
-        public async Task SendIceCandidate(string callId, object iceCandidate)
-        {
-            try
-            {
-                var participants = await _callService.GetCallParticipantsAsync(UserId, callId);
-
-                foreach (var participant in participants)
-                {
-                    if (!participant.Equals(UserId))
-                    {
-                        await Clients.User(participant).SendAsync("ReceiveIceCandidate", new Dictionary<string, object>
-                        {
-                            { "callId", callId },
-                            { "iceCandidate", iceCandidate }
-                        });
-                    }
-                }
-            }
-            catch (Exception ex) when (
-                ex is NotFoundException ||
-                ex is BadRequestException ||
-                ex is ForbiddenException)
-            {
-                await Clients.Caller.SendAsync("ValidationError", new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                await Clients.Caller.SendAsync("UnexpectedError", new { message = "خطای غیرمنتظره‌ای در ارسال ICE Candidate رخ داد!", errorDetails = ex.Message });
-            }
-        }
     }
 }

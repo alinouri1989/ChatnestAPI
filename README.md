@@ -1,22 +1,22 @@
-![ChatNestAllDevicesBanner 1 (2)](https://github.com/user-attachments/assets/ac66ba94-dad3-450a-b085-5011af846bab)
+﻿![ChatNestAllDevicesBanner 1 (2)](https://github.com/user-attachments/assets/ac66ba94-dad3-450a-b085-5011af846bab)
 
 
-### 🎯 Project Purpose  
+### ðŸŽ¯ Project Purpose  
 
 This project was initiated as part of the **BSM307 Computer Networks** course in the **Computer Technologies and Information Systems (CTIS)** department. The goal was to develop a real-time chat application as part of the course.  
 
-Over time, the project was further developed by **Nazmi KOÇAK** and **Hamza Ali DOĞAN**, evolving into a more comprehensive application. After an extensive development process, the project was successfully completed on **March 25, 2025**.  
+Over time, the project was further developed by **Nazmi KOÃ‡AK** and **Hamza Ali DOÄžAN**, evolving into a more comprehensive application. After an extensive development process, the project was successfully completed on **March 25, 2025**.  
 
 The primary purpose of this project was to help the development team successfully complete the **course** while gaining hands-on experience with a large-scale software implementation.  
 
 Our main objective was to create a **user-friendly, minimalist, and modern real-time chat application** with a smooth and engaging user experience.  
 
 
-### 🌐 Target Audience  
+### ðŸŒ Target Audience  
 
 This project is designed for **software developers, students, employers, and web users** who are interested in real-time communication technologies.  
 
-- **Software developers and students** can explore the project's architecture, WebSocket/WebRTC integration, performance optimizations, UI/UX design and modern website layout to improve their technical skills or get inspired.
+- **Software developers and students** can explore the project's architecture, WebSocket/LiveKit integration, performance optimizations, UI/UX design and modern website layout to improve their technical skills or get inspired.
 
 - **Employers** can assess our software development skills, problem-solving abilities, and work discipline by reviewing the project's implementation.
 
@@ -30,113 +30,113 @@ This project serves as an example of how **real-time messaging, group chats, mul
 ![mingle runasp net_swagger_index html](https://github.com/user-attachments/assets/25a112c3-3d48-4b15-a0bf-c98242b34a1d)
 
 
-### 🔐 **Authentication & Authorization**
+### ðŸ” **Authentication & Authorization**
 - Account creation with email and password.
 - Quick registration using **Google** and **Facebook**.
 - Password reset via email.
 - JWT based secure login.
    
-### 💬 **Real-Time Messaging**
+### ðŸ’¬ **Real-Time Messaging**
 - Real-time **group** and **individual** messaging support.
 - Message **status** tracking (sent, delivered, read).
 - AI-integrated response generation.
 - File and media attachment support.
 - Options to **delete** and **copy** messages.
    
-### 📞 **Voice and Video Calls** 📱🎥
+### ðŸ“ž **Voice and Video Calls** ðŸ“±ðŸŽ¥
 - One-to-one voice and video calls with registered users.
 - Mute microphone and toggle speaker on/off.
 - Call logs tracked with status and type.
    
-### ✨ **AI-Generated Content**
+### âœ¨ **AI-Generated Content**
 - Integrated with external AI models (Gemini, Flux, Artples, Compvis).
 - **Text & image** generation via API endpoints.
 - **Rebuilding**, **liking** and **copying** AI responses.
    
-### 🧾 **Call Logs and Archives**  
+### ðŸ§¾ **Call Logs and Archives**  
 - Full call history tracking that can be cleared on demand.
 - **Archiving** and **unarchiving** options for individual chats.
    
-### 👥 **Group Management**  
+### ðŸ‘¥ **Group Management**  
 - Group creation and **role-based** permissions.
 - Group admin controls (add, remove, update roles).
 - Ability to **leave** the group at any time.
    
-### ☁️ **Media & File Uploads**  
+### â˜ï¸ **Media & File Uploads**  
 - **File processing** for optimized delivery.
 - MIME/type validation, secure upload, and retrieval.
 - Supported: **DOC, XLSX, TXT, ZIP, MP3, WEBP, PNG etc**.
    
-### 🔧 **Configuration and Error Handling**  
+### ðŸ”§ **Configuration and Error Handling**  
 - Field/File validation helpers.
 - **Clean** and **scalable** structure.
 - Global exception handling through dedicated exception middleware.
    
-### ⚙️ **Settings**
+### âš™ï¸ **Settings**
 - User account management.
 - Theme customization. 
 - Security settings.
 - Help & support
    
-### 🔑 **Message Encryption**
+### ðŸ”‘ **Message Encryption**
 - **End-to-end encryption** for secure communication.
 - All chat messages are encrypted for enhanced privacy.
    
-### 🔍 **Search**
+### ðŸ” **Search**
 - Search for specific users, groups, calls, and archives.
    
-### 📱 **Device Compatibility**  
+### ðŸ“± **Device Compatibility**  
 - Works well on both **desktop** and **mobile devices**.  
 - Adjusts to different screen sizes for a smooth experience.  
    
 ![369714386-693d2a0b-b493-4e18-befa-da1365294af0](https://github.com/user-attachments/assets/03ca933f-35ce-420b-9412-9e56917543e0)
 
-### 🖥️ **ASP.NET Core Web API**
+### ðŸ–¥ï¸ **ASP.NET Core Web API**
 ASP.NET is a robust framework for building backend APIs. It serves as the backbone of this project, handling data processing, user authentication, and real-time communication with the frontend.
    
-### ⚛️ **React**
+### âš›ï¸ **React**
 React is a JavaScript library for building user interfaces. It helps create dynamic and reusable components, enhancing the user experience and making the application more maintainable.
    
-### 🎨 **Sass/SCSS**
+### ðŸŽ¨ **Sass/SCSS**
 Sass/SCSS is a powerful and organized version of CSS. It provides advanced features like variables, nesting, and mixins, helping to structure and maintain large-scale CSS more effectively.
    
-### 🔑 **Firebase Authentication**
+### ðŸ”‘ **Firebase Authentication**
 Firebase Authentication is used to handle user authentication securely. It allows users to sign up and log in using email/password or third-party services like Google and Facebook.
    
-### 🔥 **Firebase Realtime Database**
+### ðŸ”¥ **Firebase Realtime Database**
 Firebase Realtime Database enables real-time synchronization of data across all clients. It is used to store and manage user data, chat history, call logs, and group records efficiently.
    
-### ☁️ **Cloudinary**
+### â˜ï¸ **Cloudinary**
 Cloudinary is a powerful cloud-based media management service used for storing, optimizing, and delivering images and files. In this project, it handles media uploads, transformations, and fast content delivery, ensuring efficient and scalable asset management.
    
-### 🔌 **WebSocket**
+### ðŸ”Œ **WebSocket**
 WebSocket provides full-duplex communication channels over a single TCP connection, enabling real-time, bidirectional communication between the frontend and backend, crucial for live messaging and updates.
    
-### 🎥 **WebRTC**
-WebRTC enables real-time peer-to-peer communication, including voice and video calls. It allows users to connect with each other seamlessly for interactive communication.
+### ðŸŽ¥ **LiveKit**
+LiveKit provides the real-time media layer for voice and video calls, while SignalR keeps handling call lifecycle events such as ringing, accepting, ending, and history updates.
    
-### ⚡ **Vite**
+### âš¡ **Vite**
 Vite is a fast and efficient build tool for modern web projects. It enables quick reload and builds, improving the development workflow and integrating smoothly with React.
    
-### 🌐 **Netlify**
+### ðŸŒ **Netlify**
 Netlify is a platform for deploying and hosting the project. It automates the deployment process, ensuring the app is live and served securely on the web.
 
-### 🗄️ **Monster ASP.NET**
+### ðŸ—„ï¸ **Monster ASP.NET**
 It is a platform focused on hosting ASP.NET and .NET Core applications. It automates the deployment process, ensuring the app is live and served securely on the web.
    
 ![projectdependencies](https://github.com/user-attachments/assets/6448ea9b-da46-40e1-b4a5-b039ac4ec629)
 
-### 📁 **ChatNest.API**
+### ðŸ“ **ChatNest.API**
 - Microsoft.AspNetCore.SignalR
 - Swashbuckle.AspNetCore (Swagger)
 - Microsoft.AspNetCore.Authentication.JwtBearer
 
-### 📁 **ChatNest.Core**
+### ðŸ“ **ChatNest.Core**
 - Microsoft.Extensions.Configuration
 - Microsoft.IdentityModel.JsonWebTokens
 - Microsoft.IdentityModel.Tokens
 
-### 📁 **ChatNest.DataAccess**
+### ðŸ“ **ChatNest.DataAccess**
 - CloudinaryDotNet
 - FirebaseDatabase.net
 - FirebaseAuthentication.net
@@ -144,10 +144,10 @@ It is a platform focused on hosting ASP.NET and .NET Core applications. It autom
 - Microsoft.Extensions.Configuration
 - Microsoft.Extensions.Options
 
-### 📁 **ChatNest.Services**
+### ðŸ“ **ChatNest.Services**
 - AutoMapper
 
-### 📁 **ChatNest.Entities & Shared**
+### ðŸ“ **ChatNest.Entities & Shared**
 - There are no NuGet packages installed.
 
 ![ProjectProcess](https://github.com/user-attachments/assets/ddf11844-0b92-40fb-b065-0062a101ceac)
@@ -223,11 +223,11 @@ By making sure all configurations and setups were in place, we ensured a smooth 
 ___
 
 ### **7. Project Folder Structure**
-In this phase, we focused on creating a clear and organized folder structure for the project. The goal was to make it easy to manage and navigate through the project’s files. We carefully decided how to organize the codebase, making sure that the folders were logically named and categorized.
+In this phase, we focused on creating a clear and organized folder structure for the project. The goal was to make it easy to manage and navigate through the projectâ€™s files. We carefully decided how to organize the codebase, making sure that the folders were logically named and categorized.
 
 By setting up the folder structure in an efficient way, we ensured that the project would be scalable and maintainable in the long run. This organization helped both the development team and future contributors easily find and update the necessary files without confusion.
 
-![پوشه](https://github.com/user-attachments/assets/613156b6-a554-4aad-96a1-1ef7e02d86f2)
+![Ù¾ÙˆØ´Ù‡](https://github.com/user-attachments/assets/613156b6-a554-4aad-96a1-1ef7e02d86f2)
 
 ___
 
@@ -244,7 +244,7 @@ This stage marked the transition from architectural planning to the implementati
 
 A critical aspect of this phase involved translating conceptual designs and technical specifications into actual service implementations, primarily focusing on the integration of real-time communication protocols, user identity infrastructure, and secure data handling workflows. Leveraging the **ASP.NET Core Web API** framework and **.NET 8** runtime, we constructed controllers, services, and data access layers that adhered to **SOLID** principles and clean architecture conventions.
 
-Throughout development, the team conducted extensive research to identify the most efficient solutions for each requirement. This included evaluating existing NuGet packages and third-party libraries for functionalities such as **JWT** authentication, **SignalR** for real-time communication, and **WebRTC** for multimedia streaming.
+Throughout development, the team conducted extensive research to identify the most efficient solutions for each requirement. This included evaluating existing NuGet packages and third-party libraries for functionalities such as **JWT** authentication, **SignalR** for real-time communication, and **LiveKit** for multimedia streaming.
 
 Functionality was implemented incrementally and accompanied by unit and integration testing to ensure system stability and correctness. Special attention was given to API versioning, error handling strategies, and consistent **RESTful** endpoint design, all of which were documented via **OpenAPI (Swagger)** specifications.
 
@@ -262,7 +262,7 @@ By continuously evaluating our progress, we ensured that the project stayed on t
 ___
 
 ### **11. Completing the Coding Process**  
-At this stage, we finalized the development of all planned backend features and ensured that the system was fully functional and production-ready. After implementing the core services—including real-time messaging, authentication, media signaling, and user/group management—we conducted a thorough codebase review to identify redundant logic, enhance maintainability, and improve overall code quality.
+At this stage, we finalized the development of all planned backend features and ensured that the system was fully functional and production-ready. After implementing the core servicesâ€”including real-time messaging, authentication, media signaling, and user/group managementâ€”we conducted a thorough codebase review to identify redundant logic, enhance maintainability, and improve overall code quality.
 
 We then transitioned into the performance optimization phase, focusing on techniques to improve backend efficiency, scalability, and response times. Key areas of optimization included:
 
@@ -281,7 +281,7 @@ During this phase, our primary focus was on making the backend system more **sca
 
 - **Database Indexing and Query Optimization:** We analyzed frequently used queries and added indexes to key fields to reduce query time. We also refactored slow or repetitive queries, especially for real-time messaging and user search features.
 
-- **Connection Management:** For SignalR and WebRTC signaling, we optimized connection lifetimes and resource management to ensure low-latency communication and stable session handling, even with concurrent users.
+- **Connection Management:** For SignalR call lifecycle events and LiveKit media sessions, we optimized connection lifetimes and resource management to ensure low-latency communication and stable session handling, even with concurrent users.
 
 - **Asynchronous Task Handling:** We offloaded time-consuming processes like file storage, message archiving, and logging to background services using asynchronous patterns and queuing systems. This reduced blocking and improved throughput for the main API threads.
 
@@ -299,16 +299,16 @@ At this stage, we focused on ensuring the **security, stability, and reliability
 One of the most critical aspects of this phase was securing user data and preventing unauthorized access. Since we used **Firebase**, we implemented strict **Firestore security rules** to control data access and ensure that users could only interact with the data they were authorized to. We carefully defined these rules to protect personal information, messages, and other sensitive data.  
 
 #### **API Testing with Postman**
-To validate the backend functionality, we used **Postman** to test both **HTTP** and **WebSocket** endpoints. This allowed us to simulate real-world interactions such as user login, message sending, file uploads, and WebRTC signaling. By testing with Postman, we ensured our APIs responded correctly, handled errors gracefully, and maintained proper authentication and authorization protocols. WebSocket-based messaging scenarios were also verified to confirm real-time message delivery and status updates.
+To validate the backend functionality, we used **Postman** to test both **HTTP** and **WebSocket** endpoints. This allowed us to simulate real-world interactions such as user login, message sending, file uploads, and SignalR call lifecycle events. By testing with Postman, we ensured our APIs responded correctly, handled errors gracefully, and maintained proper authentication and authorization protocols. WebSocket-based messaging scenarios were also verified to confirm real-time message delivery and status updates.
 
 #### **Testing with Real Users**  
 To understand how the application performs in real-world scenarios, we conducted tests with real users. These tests helped us gather valuable feedback and identify any unexpected behaviors that might affect the user experience.  
 
 #### **Testing Different Scenarios**  
 We performed various test cases to ensure the system worked seamlessly across different conditions, including:  
-- **Multi-device testing** – A single user logging in from multiple devices (e.g., phone, tablet, and desktop) to verify real-time synchronization.  
-- **Cross-browser testing** – Running the app on different browsers (Chrome, Firefox, Edge, Safari) to check for compatibility issues.  
-- **Network conditions testing** – Evaluating how the app handles slow or unstable internet connections.  
+- **Multi-device testing** â€“ A single user logging in from multiple devices (e.g., phone, tablet, and desktop) to verify real-time synchronization.  
+- **Cross-browser testing** â€“ Running the app on different browsers (Chrome, Firefox, Edge, Safari) to check for compatibility issues.  
+- **Network conditions testing** â€“ Evaluating how the app handles slow or unstable internet connections.  
 
 Throughout this phase, we **monitored system behavior**, analyzed logs, and fixed any detected issues to ensure our **authentication, real-time messaging, and security systems** worked flawlessly.  
 
@@ -325,10 +325,10 @@ The deployment phase marked the final stage before releasing the backend service
 We deployed the backend on **Monster ASP.NET**, a reliable Windows-based hosting provider that supports ASP.NET Core applications. To automate the deployment process, we integrated **GitHub Actions** into our **CI/CD** pipeline. With every new push to the main branch, GitHub Actions would **automatically build the project** and **deploy it to the Monster ASP.NET server**, ensuring that the latest code was always live and consistent across environments.
 
 #### SSL Certificate Integration
-To ensure secure communication across the application, we configured and applied a valid SSL certificate on the server. This secured all API endpoints with **HTTPS**, which is especially critical for **WebRTC signaling**, **authentication**, and **file transfer** operations.
+To ensure secure communication across the application, we configured and applied a valid SSL certificate on the server. This secured all API endpoints with **HTTPS**, which is especially critical for **LiveKit tokens**, **authentication**, and **file transfer** operations.
 
 #### Challenges & Solutions
-While setting up automated deployment, we encountered challenges related to **build configuration compatibility** and **server file access permissions**. These were addressed by customizing the build scripts within GitHub Actions and adjusting the hosting environment’s security policies to allow smooth deployments and runtime operations.
+While setting up automated deployment, we encountered challenges related to **build configuration compatibility** and **server file access permissions**. These were addressed by customizing the build scripts within GitHub Actions and adjusting the hosting environmentâ€™s security policies to allow smooth deployments and runtime operations.
 
 With this setup, the backend became **robust**, **automated**, and **production-ready**, enabling real-time features and secure communication to function seamlessly alongside the frontend.
 
@@ -354,7 +354,7 @@ This phase is crucial because it ensures the application keeps evolving to meet 
 
 - **Release Date**: 25.03.2025  
 
-- **Last Updated**: 29.03.2025 🕟 12:00  
+- **Last Updated**: 29.03.2025 ðŸ•Ÿ 12:00  
 
 - **Version**: 1.000.0.0  
 
@@ -369,4 +369,5 @@ This phase is crucial because it ensures the application keeps evolving to meet 
 - **Developers**:  
   The **backend** of the project was developed by **ali nouri**. For more information about the developer, please visit the [LinkedIn profile](https://www.linkedin.com/in/alinouri1989/).  
   The **frontend** of the project was developed by **ali nouri**. For more details, you can visit the [frontend repository](https://github.com/alinouri1989/ChatNest).  
+
 
