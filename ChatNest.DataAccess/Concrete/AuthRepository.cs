@@ -1,6 +1,9 @@
 ﻿using ChatNest.DataAccess.Abstract;
 using ChatNest.Entities.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using ChatNest.DataAccess.Contexts;
+using ChatNest.Entities.Identity;
 
 namespace ChatNest.DataAccess.Concrete
 {
@@ -8,11 +11,16 @@ namespace ChatNest.DataAccess.Concrete
     {
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
+        private readonly ChatNestDbContext _dbContext;
 
-        public AuthRepository(UserManager<User> userManager, SignInManager<User> signInManager)
+        public AuthRepository(
+            UserManager<User> userManager,
+            SignInManager<User> signInManager,
+            ChatNestDbContext dbContext)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _dbContext = dbContext;
         }
 
         public async Task<IdentityResult> CreateUserAsync(User user, string password)
@@ -52,6 +60,66 @@ namespace ChatNest.DataAccess.Concrete
         public async Task<User?> FindByIdAsync(string userId)
         {
             return await _userManager.FindByIdAsync(userId);
+        }
+
+        public async Task AddRefreshTokenAsync(RefreshToken refreshToken)
+        {
+            _dbContext.Set<RefreshToken>().Add(refreshToken);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        public async Task<string?> RotateRefreshTokenAsync(
+            string currentTokenHash,
+            RefreshToken replacementToken)
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+            var now = DateTime.UtcNow;
+
+            var currentToken = await _dbContext.Set<RefreshToken>()
+                .AsNoTracking()
+                .Where(token => token.Token == currentTokenHash &&
+                                token.IsActive &&
+                                token.Revoked == null &&
+                                token.Expiration > now)
+                .Select(token => new { token.UserId })
+                .SingleOrDefaultAsync();
+
+            if (currentToken == null)
+            {
+                return null;
+            }
+
+            var updatedRows = await _dbContext.Set<RefreshToken>()
+                .Where(token => token.Token == currentTokenHash &&
+                                token.IsActive &&
+                                token.Revoked == null &&
+                                token.Expiration > now)
+                .ExecuteUpdateAsync(updates => updates
+                    .SetProperty(token => token.IsActive, false)
+                    .SetProperty(token => token.Revoked, now));
+
+            if (updatedRows != 1)
+            {
+                await transaction.RollbackAsync();
+                return null;
+            }
+
+            replacementToken.UserId = currentToken.UserId;
+            _dbContext.Set<RefreshToken>().Add(replacementToken);
+            await _dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return currentToken.UserId;
+        }
+
+        public async Task RevokeRefreshTokenAsync(string tokenHash)
+        {
+            var now = DateTime.UtcNow;
+            await _dbContext.Set<RefreshToken>()
+                .Where(token => token.Token == tokenHash && token.IsActive)
+                .ExecuteUpdateAsync(updates => updates
+                    .SetProperty(token => token.IsActive, false)
+                    .SetProperty(token => token.Revoked, now));
         }
 
         public async Task SignOutAsync()

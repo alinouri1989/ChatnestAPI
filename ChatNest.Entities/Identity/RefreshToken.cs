@@ -7,7 +7,7 @@ namespace ChatNest.Entities.Identity
     public class RefreshToken
     {
         [Key]
-        public string Token { get; set; }
+        public string Token { get; set; } = string.Empty;
 
         public DateTime Expiration { get; set; }
 
@@ -20,8 +20,8 @@ namespace ChatNest.Entities.Identity
         public bool IsActive { get; set; }
 
         [ForeignKey("User")]
-        public string UserId { get; set; }
+        public string UserId { get; set; } = string.Empty;
 
-        public virtual User User { get; set; }
+        public virtual User User { get; set; } = null!;
     }
 }

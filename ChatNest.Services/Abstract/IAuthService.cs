@@ -7,9 +7,11 @@ namespace ChatNest.Services.Abstract
     public interface IAuthService
     {
         Task<IdentityResult> SignUpAsync(SignUp dto);
-        Task<string> SignInEmailAsync(SignInEmail dto);
-        Task<string> SignInGoogleAsync(SignInProvider dto);
-        Task<string> SignInFacebookAsync(SignInProvider dto);
+        Task<AuthTokenResponse> SignInEmailAsync(SignInEmail dto);
+        Task<AuthTokenResponse> SignInGoogleAsync(SignInProvider dto);
+        Task<AuthTokenResponse> SignInFacebookAsync(SignInProvider dto);
+        Task<AuthTokenResponse> RefreshTokenAsync(string refreshToken);
+        Task RevokeRefreshTokenAsync(string refreshToken);
         Task ResetPasswordAsync(string email);
         Task ConfirmResetPasswordAsync(ResetPasswordConfirm dto);
         Task<PasswordSecurityQuestionPrompt> GetPasswordFallbackQuestionAsync(string email);

@@ -1,5 +1,6 @@
 ﻿using ChatNest.Entities.Models;
 using Microsoft.AspNetCore.Identity;
+using ChatNest.Entities.Identity;
 
 namespace ChatNest.DataAccess.Abstract
 {
@@ -11,6 +12,9 @@ namespace ChatNest.DataAccess.Abstract
         Task<IdentityResult> ResetPasswordAsync(string email);
         Task<User?> FindByEmailAsync(string email);
         Task<User?> FindByIdAsync(string userId);
+        Task AddRefreshTokenAsync(RefreshToken refreshToken);
+        Task<string?> RotateRefreshTokenAsync(string currentTokenHash, RefreshToken replacementToken);
+        Task RevokeRefreshTokenAsync(string tokenHash);
         Task SignOutAsync();
     }
 }

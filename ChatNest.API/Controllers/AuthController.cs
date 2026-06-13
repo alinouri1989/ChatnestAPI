@@ -87,7 +87,11 @@ namespace ChatNest.API.Controllers
             }
             try
             {
-                return Ok(new { token = await _authService.SignInEmailAsync(dto) });
+                return Ok(await _authService.SignInEmailAsync(dto));
+            }
+            catch (BadRequestException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (FirebaseAuthHttpException ex)
             {
@@ -127,7 +131,7 @@ namespace ChatNest.API.Controllers
             }
             try
             {
-                return Ok(new { token = await _authService.SignInGoogleAsync(dto) });
+                return Ok(await _authService.SignInGoogleAsync(dto));
             }
             catch (BadRequestException ex)
             {
@@ -163,7 +167,7 @@ namespace ChatNest.API.Controllers
         {
             try
             {
-                return Ok(new { token = await _authService.SignInFacebookAsync(dto) });
+                return Ok(await _authService.SignInFacebookAsync(dto));
             }
             catch (FirebaseAuthHttpException ex)
             {
@@ -189,11 +193,12 @@ namespace ChatNest.API.Controllers
         /// <exception cref="FirebaseAuthHttpException">زمانی که خطایی مرتبط با Firebase رخ دهد پرتاب می‌شود.</exception>
         /// <exception cref="Exception">در صورت بروز خطای غیرمنتظره پرتاب می‌شود.</exception>
         [HttpPost]
-        [Authorize]
-        public async Task<IActionResult> SignOut()
+        [AllowAnonymous]
+        public async Task<IActionResult> SignOut([FromBody] RefreshTokenRequest dto)
         {
             try
             {
+                await _authService.RevokeRefreshTokenAsync(dto.RefreshToken);
                 return Ok(new { message = "از سیستم خارج شدید." });
             }
             catch (FirebaseAuthHttpException ex)
@@ -203,6 +208,25 @@ namespace ChatNest.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = $"خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                return Ok(await _authService.RefreshTokenAsync(dto.RefreshToken));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
         }
 

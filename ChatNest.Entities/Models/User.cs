@@ -59,5 +59,5 @@ public class User : IdentityUser
 
     // Navigation properties
     public ICollection<Group> CreatedGroups { get; set; } = new List<Group>();
-    public virtual ICollection<RefreshToken> RefreshTokens { get; set; }
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

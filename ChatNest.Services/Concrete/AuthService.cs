@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using ChatNest.Core.Abstract;
 using ChatNest.DataAccess.Abstract;
+using ChatNest.Entities.Identity;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace ChatNest.Services.Concrete
@@ -79,20 +81,20 @@ namespace ChatNest.Services.Concrete
             }
         }
 
-        public async Task<string> SignInEmailAsync(SignInEmail dto)
+        public async Task<AuthTokenResponse> SignInEmailAsync(SignInEmail dto)
         {
             var result = await _authRepository.SignInWithEmailAsync(dto.Email, dto.Password);
 
             if (result.Succeeded)
             {
                 var user = await _authRepository.FindByEmailAsync(dto.Email);
-                return await Task.Run(() => _jwtManager.GenerateToken(user!.Id));
+                return await IssueTokensAsync(user!.Id);
             }
 
             throw new BadRequestException("نام کاربری یا کلمه عبور صحیح نمی باشد");
         }
 
-        public async Task<string> SignInGoogleAsync(SignInProvider dto)
+        public async Task<AuthTokenResponse> SignInGoogleAsync(SignInProvider dto)
         {
             var user = await _userRepository.GetUserByProviderIdAsync(dto.Uid);
             var providerData = dto.ProviderData?.FirstOrDefault();
@@ -122,10 +124,10 @@ namespace ChatNest.Services.Concrete
                 throw new BadRequestException("Invalid provider payload");
             }
 
-            return await Task.Run(() => _jwtManager.GenerateToken(user.Id));
+            return await IssueTokensAsync(user.Id);
         }
 
-        public async Task<string> SignInFacebookAsync(SignInProvider dto)
+        public async Task<AuthTokenResponse> SignInFacebookAsync(SignInProvider dto)
         {
             var user = await _userRepository.GetUserByProviderIdAsync(dto.Uid);
             var providerData = dto.ProviderData?.FirstOrDefault();
@@ -155,7 +157,76 @@ namespace ChatNest.Services.Concrete
                 throw new BadRequestException("Invalid provider payload");
             }
 
-            return await Task.Run(() => _jwtManager.GenerateToken(user.Id));
+            return await IssueTokensAsync(user.Id);
+        }
+
+        public async Task<AuthTokenResponse> RefreshTokenAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                throw new UnauthorizedAccessException("Refresh token is required.");
+            }
+
+            var replacement = CreateRefreshToken();
+            var userId = await _authRepository.RotateRefreshTokenAsync(
+                HashRefreshToken(refreshToken),
+                replacement.Entity);
+
+            if (userId == null)
+            {
+                throw new UnauthorizedAccessException("Refresh token is invalid or expired.");
+            }
+
+            return new AuthTokenResponse
+            {
+                Token = _jwtManager.GenerateToken(userId),
+                RefreshToken = replacement.RawToken,
+                RefreshTokenExpiration = replacement.Entity.Expiration
+            };
+        }
+
+        public async Task RevokeRefreshTokenAsync(string refreshToken)
+        {
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+            {
+                await _authRepository.RevokeRefreshTokenAsync(HashRefreshToken(refreshToken));
+            }
+        }
+
+        private async Task<AuthTokenResponse> IssueTokensAsync(string userId)
+        {
+            var refreshToken = CreateRefreshToken();
+            refreshToken.Entity.UserId = userId;
+            await _authRepository.AddRefreshTokenAsync(refreshToken.Entity);
+
+            return new AuthTokenResponse
+            {
+                Token = _jwtManager.GenerateToken(userId),
+                RefreshToken = refreshToken.RawToken,
+                RefreshTokenExpiration = refreshToken.Entity.Expiration
+            };
+        }
+
+        private (string RawToken, RefreshToken Entity) CreateRefreshToken()
+        {
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+            var expiryInDays = _configuration.GetValue<int?>("JWT:RefreshTokenExpiryInDays") ?? 30;
+
+            return (rawToken, new RefreshToken
+            {
+                Token = HashRefreshToken(rawToken),
+                Created = DateTime.UtcNow,
+                Expiration = DateTime.UtcNow.AddDays(expiryInDays),
+                IsActive = true
+            });
+        }
+
+        private static string HashRefreshToken(string refreshToken)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
         }
 
         public async Task ResetPasswordAsync(string email)
