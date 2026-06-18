@@ -91,6 +91,52 @@ namespace ChatNest.DataAccess.Concrete
             }
         }
 
+        public async Task<Dictionary<string, List<string>>> GetFcmTokensByUserIdsAsync(IEnumerable<string> userIds)
+        {
+            var usersById = await GetUsersByIdsAsync(userIds);
+            return usersById.ToDictionary(
+                item => item.Key,
+                item => item.Value.FcmTokens
+                    .Where(token => !string.IsNullOrWhiteSpace(token))
+                    .Distinct()
+                    .ToList());
+        }
+
+        public async Task RemoveFcmTokensAsync(IEnumerable<string> tokens)
+        {
+            var tokensToRemove = (tokens ?? Enumerable.Empty<string>())
+                .Where(token => !string.IsNullOrWhiteSpace(token))
+                .Distinct()
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (tokensToRemove.Count == 0)
+                return;
+
+            var users = await _context.Users
+                .Where(user => !string.IsNullOrWhiteSpace(user.FcmTokensJson))
+                .ToListAsync();
+
+            var changed = false;
+            foreach (var user in users)
+            {
+                var currentTokens = user.FcmTokens;
+                var filteredTokens = currentTokens
+                    .Where(token => !tokensToRemove.Contains(token))
+                    .ToList();
+
+                if (filteredTokens.Count != currentTokens.Count)
+                {
+                    user.FcmTokens = filteredTokens;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                await _context.SaveChangesAsync();
+            }
+        }
+
         public async Task<bool> DeleteUserAsync(string userId)
         {
             var user = await _context.Users.FindAsync(userId);

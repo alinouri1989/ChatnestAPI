@@ -329,6 +329,53 @@ namespace ChatNest.API.Controllers
             }
         }
 
+        [HttpPost]
+        public async Task<IActionResult> FirebaseToken([FromBody] FirebaseTokenRequest dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _userService.RegisterFirebaseTokenAsync(UserId, dto);
+                return Ok(new { message = "Firebase notification token registered." });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
+        [HttpDelete]
+        [ActionName("FirebaseToken")]
+        public async Task<IActionResult> RemoveFirebaseToken([FromBody] FirebaseTokenRequest dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _userService.RemoveFirebaseTokenAsync(UserId, dto);
+                return Ok(new { message = "Firebase notification token removed." });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "خطای غیرمنتظره‌ای رخ داده است!", errorDetails = ex.Message });
+            }
+        }
+
         /// <summary>
         /// تنظیمات تم کاربر را به‌روزرسانی می‌کند.
         /// تم جدید با موفقیت به‌روزرسانی می‌شود.

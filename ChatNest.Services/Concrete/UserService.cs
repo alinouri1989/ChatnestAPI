@@ -300,6 +300,43 @@ namespace ChatNest.Services.Concrete
             await _userRepository.UpdateUserAsync(user);
         }
 
+        public async Task RegisterFirebaseTokenAsync(string userId, FirebaseTokenRequest dto)
+        {
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            var token = dto.Token.Trim();
+            var tokens = user.FcmTokens
+                .Where(existingToken => !string.IsNullOrWhiteSpace(existingToken))
+                .ToList();
+
+            if (!tokens.Contains(token, StringComparer.Ordinal))
+            {
+                tokens.Add(token);
+                user.FcmTokens = tokens;
+                await _userRepository.UpdateUserAsync(user);
+            }
+        }
+
+        public async Task RemoveFirebaseTokenAsync(string userId, FirebaseTokenRequest dto)
+        {
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            var token = dto.Token.Trim();
+            var tokens = user.FcmTokens
+                .Where(existingToken => !string.Equals(existingToken, token, StringComparison.Ordinal))
+                .ToList();
+
+            if (tokens.Count != user.FcmTokens.Count)
+            {
+                user.FcmTokens = tokens;
+                await _userRepository.UpdateUserAsync(user);
+            }
+        }
+
         public async Task<Dictionary<string, RecipientProfile>> GetRecipientProfilesAsync(List<string> recipientIds)
         {
             var result = new Dictionary<string, RecipientProfile>();

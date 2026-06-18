@@ -85,6 +85,7 @@ namespace ChatNest.DataAccess.Contexts
                 entity.Property(e => e.PhoneNumber).HasMaxLength(15);
                 entity.Property(e => e.Biography).HasMaxLength(500);
                 entity.Property(e => e.ProviderId).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.FcmTokensJson).HasColumnType("nvarchar(max)");
                 entity.HasIndex(e => e.UserIdentifier)
                       .IsUnique()
                       .HasFilter("[UserIdentifier] IS NOT NULL");

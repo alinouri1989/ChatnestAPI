@@ -13,6 +13,8 @@ namespace ChatNest.DataAccess.Abstract
         Task UpdateUserFieldAsync(string userId, string fieldName, object newValue);
         Task UpdateUserAsync(User user);
         Task UpdateLastConnectionDateAsync(string userId, DateTime lastConnectionDate);
+        Task<Dictionary<string, List<string>>> GetFcmTokensByUserIdsAsync(IEnumerable<string> userIds);
+        Task RemoveFcmTokensAsync(IEnumerable<string> tokens);
         Task<bool> DeleteUserAsync(string userId);
         Task<IEnumerable<User>> SearchUsersAsync(string searchTerm);
     }

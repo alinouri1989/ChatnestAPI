@@ -1,4 +1,5 @@
 ﻿using ChatNest.API.Hubs;
+
 using ChatNest.Core.Abstract;
 using ChatNest.Core.Concrete;
 using ChatNest.DataAccess.Abstract;
@@ -186,6 +187,7 @@ try
     builder.Services.AddScoped<IGroupService, GroupService>();
     builder.Services.AddScoped<ICallService, CallService>();
     builder.Services.AddScoped<IGenerativeAiService, GenerativeAiService>();
+    builder.Services.AddScoped<INotificationService, FirebaseNotificationService>();
 
     // Add HttpClient for AI services
     builder.Services.AddHttpClient();

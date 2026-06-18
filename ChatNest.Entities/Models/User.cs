@@ -48,6 +48,8 @@ public class User : IdentityUser
     // Store as JSON string in database
     public string UserSettingsJson { get; set; } = string.Empty;
 
+    public string FcmTokensJson { get; set; } = string.Empty;
+
     [NotMapped]
     public UserSettings UserSettings
     {
@@ -55,6 +57,15 @@ public class User : IdentityUser
                new UserSettings() :
                JsonSerializer.Deserialize<UserSettings>(UserSettingsJson) ?? new UserSettings();
         set => UserSettingsJson = JsonSerializer.Serialize(value);
+    }
+
+    [NotMapped]
+    public List<string> FcmTokens
+    {
+        get => string.IsNullOrEmpty(FcmTokensJson) ?
+               new List<string>() :
+               JsonSerializer.Deserialize<List<string>>(FcmTokensJson) ?? new List<string>();
+        set => FcmTokensJson = JsonSerializer.Serialize(value.Distinct().ToList());
     }
 
     // Navigation properties

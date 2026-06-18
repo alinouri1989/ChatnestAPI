@@ -53,6 +53,8 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.microsoft.signalr:signalr:<latest-stable>")
     implementation("io.reactivex.rxjava3:rxjava:3.1.10")
+    implementation(platform("com.google.firebase:firebase-bom:<latest-stable>"))
+    implementation("com.google.firebase:firebase-messaging")
 
     // Needed if you use backend LiveKit token flow for audio/video media.
     implementation("io.livekit:livekit-android:<current-version>")
@@ -60,6 +62,91 @@ dependencies {
 ```
 
 LiveKit Android installation and permissions are documented by LiveKit at https://docs.livekit.io/transport/sdk-platforms/android/. LiveKit requires microphone/camera runtime permissions for voice/video.
+
+## Firebase Push Notifications
+
+Add your Android app to the Firebase project, download `google-services.json`, place it in the Android app module, and apply the Google Services Gradle plugin. The app must send its FCM registration token to ChatNest after login and whenever Firebase refreshes it.
+
+REST endpoints:
+
+```http
+POST /api/User/FirebaseToken
+DELETE /api/User/FirebaseToken
+Authorization: Bearer <jwt>
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "token": "<firebase-fcm-registration-token>",
+  "platform": "android"
+}
+```
+
+Kotlin token registration:
+
+```kotlin
+data class FirebaseTokenRequest(
+    val token: String,
+    val platform: String = "android"
+)
+
+interface UserApi {
+    @POST("api/User/FirebaseToken")
+    suspend fun registerFirebaseToken(@Body body: FirebaseTokenRequest)
+
+    @HTTP(method = "DELETE", path = "api/User/FirebaseToken", hasBody = true)
+    suspend fun removeFirebaseToken(@Body body: FirebaseTokenRequest)
+}
+
+fun syncFirebaseToken(userApi: UserApi) {
+    FirebaseMessaging.getInstance().token
+        .addOnSuccessListener { token ->
+            lifecycleScope.launch {
+                userApi.registerFirebaseToken(FirebaseTokenRequest(token))
+            }
+        }
+}
+```
+
+Token refresh service:
+
+```kotlin
+class ChatNestFirebaseMessagingService : FirebaseMessagingService() {
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        // If the user is logged in, call POST /api/User/FirebaseToken with this token.
+        // Keep this work in a repository/worker that can attach the current JWT.
+    }
+
+    override fun onMessageReceived(message: RemoteMessage) {
+        super.onMessageReceived(message)
+        val chatId = message.data["chatId"]
+        val chatType = message.data["chatType"]
+        // Show/update a local notification if the app is foregrounded.
+    }
+}
+```
+
+Android manifest:
+
+```xml
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+<application>
+    <service
+        android:name=".ChatNestFirebaseMessagingService"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="com.google.firebase.MESSAGING_EVENT" />
+        </intent-filter>
+    </service>
+</application>
+```
+
+For Android 13+, request `POST_NOTIFICATIONS` at runtime. The server sends chat message pushes with Android high priority and notification channel id `chat_messages`, so create that notification channel in the Android app before showing notifications.
 
 ## JSON Naming
 
@@ -1167,4 +1254,3 @@ class BearerInterceptor(private val tokenProvider: () -> String?) : Interceptor 
 8. For self-chat, call `GetOrCreateSavedMessagesChat()`.
 9. Call `UpdateTypingStatus(chatId, true/false)` with debouncing.
 10. Use `ReadMessage` when a message becomes visible and `DeliverMessage` when it arrives locally.
-

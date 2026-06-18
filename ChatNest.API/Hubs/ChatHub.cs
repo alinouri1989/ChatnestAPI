@@ -24,6 +24,7 @@ namespace ChatNest.API.Hubs
         private readonly IGroupService _groupService;
         private readonly IChatService _chatService;
         private readonly IUserService _userService;
+        private readonly INotificationService _notificationService;
         private readonly IUserPresenceTracker _presenceTracker;
         private readonly IMapper _mapper;
 
@@ -107,6 +108,7 @@ namespace ChatNest.API.Hubs
             IGroupService groupService,
             IChatService chatService,
             IUserService userService,
+            INotificationService notificationService,
             IUserPresenceTracker presenceTracker,
             IMapper mapper)
         {
@@ -114,6 +116,7 @@ namespace ChatNest.API.Hubs
             _groupService = groupService;
             _chatService = chatService;
             _userService = userService;
+            _notificationService = notificationService;
             _presenceTracker = presenceTracker;
             _mapper = mapper;
         }
@@ -436,6 +439,19 @@ namespace ChatNest.API.Hubs
             await Clients.Caller.SendAsync("ReceiveInitialChats", _mapper.Map<ChatDto>(emptyChats));
             await Clients.Caller.SendAsync("ReceiveInitialGroupProfiles", emptyGroupProfiles);
             await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", emptyRecipientProfiles);
+        }
+
+        private static string CreateNotificationPreview(MessageContent contentType, string? fileName = null, string? content = null)
+        {
+            return contentType switch
+            {
+                MessageContent.Text => string.IsNullOrWhiteSpace(content) ? "New message" : content,
+                MessageContent.Image => "Photo",
+                MessageContent.Video => "Video",
+                MessageContent.Audio => "Voice message",
+                MessageContent.File => string.IsNullOrWhiteSpace(fileName) ? "File" : fileName,
+                _ => "New message"
+            };
         }
 
         private async Task<string?> BroadcastIndividualChatAsync(Dictionary<string, ChatDto> chat)
@@ -826,6 +842,13 @@ namespace ChatNest.API.Hubs
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
 
+                await _notificationService.SendNewMessageNotificationAsync(
+                    UserId,
+                    chatParticipants,
+                    removedSession.ChatId,
+                    removedSession.ChatType,
+                    CreateNotificationPreview(removedSession.ContentType, removedSession.FileName));
+
                 if (removedSession.SyncLock.CurrentCount == 0)
                 {
                     removedSession.SyncLock.Release();
@@ -884,6 +907,13 @@ namespace ChatNest.API.Hubs
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
+
+                await _notificationService.SendNewMessageNotificationAsync(
+                    UserId,
+                    chatParticipants,
+                    chatId,
+                    chatType,
+                    CreateNotificationPreview(dto.ContentType, dto.FileName, dto.Content));
             }
             catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
             {
@@ -916,6 +946,13 @@ namespace ChatNest.API.Hubs
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
+
+                await _notificationService.SendNewMessageNotificationAsync(
+                    UserId,
+                    chatParticipants,
+                    targetChatId,
+                    targetChatType,
+                    "Forwarded attachment");
             }
             catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
             {
@@ -954,6 +991,13 @@ namespace ChatNest.API.Hubs
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
+
+                await _notificationService.SendNewMessageNotificationAsync(
+                    UserId,
+                    chatParticipants,
+                    targetChatId,
+                    "Individual",
+                    "Forwarded attachment");
             }
             catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
             {
@@ -991,6 +1035,7 @@ namespace ChatNest.API.Hubs
                 {
                     await Clients.User(participant).SendAsync("ReceiveGetMessages", message);
                 }
+
             }
             catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException)
             {

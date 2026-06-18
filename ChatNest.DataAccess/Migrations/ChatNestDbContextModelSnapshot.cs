@@ -436,6 +436,10 @@ namespace ChatNest.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("FcmTokensJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("LastConnectionDate")
                         .HasColumnType("datetime2");
 

@@ -107,6 +107,10 @@ namespace ChatNest.Services.Abstract
         /// <param name="dto">اطلاعات پرسش امنیتی</param>
         Task UpdateSecurityQuestionAsync(string userId, UpdateSecurityQuestion dto);
 
+        Task RegisterFirebaseTokenAsync(string userId, FirebaseTokenRequest dto);
+
+        Task RemoveFirebaseTokenAsync(string userId, FirebaseTokenRequest dto);
+
         /// <summary>
         /// اطلاعات پروفایل چندین گیرنده را دریافت می‌کند.
         /// </summary>
