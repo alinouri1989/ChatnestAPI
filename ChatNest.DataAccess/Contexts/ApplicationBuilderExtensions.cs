@@ -7,6 +7,28 @@ namespace ChatNest.DataAccess.Contexts
 {
     public static class ApplicationBuilderExtensions
     {
+        public static async Task MigrateDatabaseAsync(this IServiceProvider services)
+        {
+            using var scope = services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ChatNestDbContext>();
+
+            const int maxAttempts = 5;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    await db.Database.MigrateAsync();
+                    return;
+                }
+                catch when (attempt < maxAttempts)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
+                }
+            }
+
+            await db.Database.MigrateAsync();
+        }
+
         public static async Task SeedIdentityDataAsync(this IServiceProvider services)
         {
             using var scope = services.CreateScope();
@@ -16,7 +38,6 @@ namespace ChatNest.DataAccess.Contexts
                     new Role {Id= Guid.NewGuid().ToString(), Name = "SpecialSupport", NormalizedName = "SpecialSupport", ConcurrencyStamp = Guid.NewGuid().ToString() },
                     new Role {Id= Guid.NewGuid().ToString(), Name = "Support", NormalizedName = "Support", ConcurrencyStamp = Guid.NewGuid().ToString() },
                     new Role {Id= Guid.NewGuid().ToString(), Name = "User", NormalizedName = "User", ConcurrencyStamp = Guid.NewGuid().ToString() } };
-            await db.Database.MigrateAsync();
 
             // Seed roles  
             if (!await db.Roles.AnyAsync())

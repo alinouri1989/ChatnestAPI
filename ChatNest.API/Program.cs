@@ -269,6 +269,10 @@ try
 
     var app = builder.Build();
 
+    Log.Information("Applying database migrations");
+    await app.Services.MigrateDatabaseAsync();
+    Log.Information("Database migrations applied");
+
     await app.Services.SeedIdentityDataAsync();
 
     app.UseSerilogRequestLogging();
