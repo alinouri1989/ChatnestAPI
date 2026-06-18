@@ -14,6 +14,7 @@ public sealed class FirebaseNotificationService : INotificationService
     private readonly IUserRepository _userRepository;
     private readonly ILogger<FirebaseNotificationService> _logger;
     private readonly bool _isEnabled;
+    private readonly Uri? _webPushBaseUri;
 
     public FirebaseNotificationService(
         IConfiguration configuration,
@@ -22,6 +23,7 @@ public sealed class FirebaseNotificationService : INotificationService
     {
         _userRepository = userRepository;
         _logger = logger;
+        _webPushBaseUri = GetWebPushBaseUri(configuration);
         _isEnabled = InitializeFirebase(configuration);
     }
 
@@ -112,15 +114,30 @@ public sealed class FirebaseNotificationService : INotificationService
                         Body = body,
                         Icon = "/pwa-192.png",
                         Badge = "/pwa-192.png"
-                    },
-                    FcmOptions = new WebpushFcmOptions
-                    {
-                        Link = $"/chats/{chatId}"
                     }
                 }
             };
 
-            var response = await FirebaseMessaging.DefaultInstance.SendEachForMulticastAsync(message, cancellationToken);
+            var webPushLink = CreateWebPushLink(chatId);
+            if (webPushLink != null)
+            {
+                message.Webpush.FcmOptions = new WebpushFcmOptions
+                {
+                    Link = webPushLink
+                };
+            }
+
+            BatchResponse response;
+            try
+            {
+                response = await FirebaseMessaging.DefaultInstance.SendEachForMulticastAsync(message, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Firebase failed to send message notification batch");
+                continue;
+            }
+
             var invalidTokens = response.Responses
                 .Select((sendResponse, index) => new { sendResponse, token = batchTokens[index] })
                 .Where(item => item.sendResponse.Exception is FirebaseMessagingException exception &&
@@ -142,6 +159,33 @@ public sealed class FirebaseNotificationService : INotificationService
                     response.FailureCount);
             }
         }
+    }
+
+    private string? CreateWebPushLink(string chatId)
+    {
+        if (_webPushBaseUri == null)
+            return null;
+
+        return new Uri(_webPushBaseUri, $"chats/{Uri.EscapeDataString(chatId)}").ToString();
+    }
+
+    private Uri? GetWebPushBaseUri(IConfiguration configuration)
+    {
+        var configuredBaseUrl = configuration["Firebase:WebPushLinkBaseUrl"];
+        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
+        {
+            configuredBaseUrl = configuration["PasswordReset:ClientBaseUrl"];
+        }
+
+        if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri) ||
+            !string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Firebase web push link is disabled because Firebase:WebPushLinkBaseUrl/PasswordReset:ClientBaseUrl is not a valid HTTPS URL.");
+            return null;
+        }
+
+        return baseUri;
     }
 
     private static string CreatePreview(string messagePreview)
