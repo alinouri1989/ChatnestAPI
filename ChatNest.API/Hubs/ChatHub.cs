@@ -2,6 +2,7 @@
 using ChatNest.Entities.Enums;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
+using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
@@ -441,16 +442,18 @@ namespace ChatNest.API.Hubs
             await Clients.Caller.SendAsync("ReceiveInitialRecipientChatProfiles", emptyRecipientProfiles);
         }
 
-        private static string CreateNotificationPreview(MessageContent contentType, string? fileName = null, string? content = null)
+        private static string CreateNotificationPreview(MessageContent contentType, string chatId, string? fileName = null, string? content = null)
         {
             return contentType switch
             {
-                MessageContent.Text => string.IsNullOrWhiteSpace(content) ? "New message" : content,
-                MessageContent.Image => "Photo",
-                MessageContent.Video => "Video",
-                MessageContent.Audio => "Voice message",
+                MessageContent.Text => string.IsNullOrWhiteSpace(content)
+                    ? "پیام جدید"
+                    : CryptoJsAesDecryptor.DecryptOrOriginal(content, chatId),
+                MessageContent.Image => "تصویر",
+                MessageContent.Video => "ویدئو",
+                MessageContent.Audio => "پیام صوتی",
                 MessageContent.File => string.IsNullOrWhiteSpace(fileName) ? "File" : fileName,
-                _ => "New message"
+                _ => "پیام جدید"
             };
         }
 
@@ -847,7 +850,7 @@ namespace ChatNest.API.Hubs
                     chatParticipants,
                     removedSession.ChatId,
                     removedSession.ChatType,
-                    CreateNotificationPreview(removedSession.ContentType, removedSession.FileName));
+                    CreateNotificationPreview(removedSession.ContentType, removedSession.ChatId, removedSession.FileName));
 
                 if (removedSession.SyncLock.CurrentCount == 0)
                 {
@@ -913,7 +916,7 @@ namespace ChatNest.API.Hubs
                     chatParticipants,
                     chatId,
                     chatType,
-                    CreateNotificationPreview(dto.ContentType, dto.FileName, dto.Content));
+                    CreateNotificationPreview(dto.ContentType, chatId, dto.FileName, dto.Content));
             }
             catch (Exception ex) when (ex is BadRequestException || ex is NotFoundException || ex is ForbiddenException)
             {

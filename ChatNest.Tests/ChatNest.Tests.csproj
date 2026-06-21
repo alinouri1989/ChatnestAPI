@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChatNest.Services\ChatNest.Services.csproj" />
     <ProjectReference Include="..\ChatNest.Shared\ChatNest.Shared.csproj" />
   </ItemGroup>
 
