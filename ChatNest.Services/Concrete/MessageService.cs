@@ -4,6 +4,7 @@ using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Exceptions;
+using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
 
 namespace ChatNest.Services.Concrete
@@ -357,8 +358,45 @@ namespace ChatNest.Services.Concrete
             return await _messageRepository.GetTotalMessageCountAsync(chatId);
         }
 
-        public async Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5) =>
-                       await _messageRepository.GetChatMessagesAsync(chatId, skip, take);
+        public async Task<IEnumerable<MessageDto>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5)
+        {
+            var messages = await _messageRepository.GetChatMessagesAsync(chatId, skip, take);
+            return _mapper.Map<IEnumerable<MessageDto>>(messages);
+        }
+
+        public async Task<ChatNest.Shared.DTOs.ChatMessagesPageResponse> GetChatMessagesPageAsync(
+            string userId,
+            Guid chatId,
+            int skip = 0,
+            int take = 50)
+        {
+            var chat = await _chatRepository.GetChatByIdAsync(chatId);
+            if (chat == null || !chat.ChatParticipants.Any(u => u.UserId == userId))
+                throw new NotFoundException("گفت و گو یافت نشد یا دسترسی به آن ندارید");
+
+            skip = Math.Max(0, skip);
+            take = Math.Clamp(take, 1, 100);
+
+            var total = await _messageRepository.GetTotalMessageCountAsync(chatId);
+            var messages = await _messageRepository.GetChatMessagesAsync(chatId, skip, take);
+            var hasNextPage = skip + take < total;
+
+            return new ChatNest.Shared.DTOs.ChatMessagesPageResponse
+            {
+                ChatId = chatId.ToString(),
+                ChatType = chat.ChatType,
+                TotalCount = total,
+                Messages = _mapper.Map<IEnumerable<MessageDto>>(messages),
+                Skip = skip,
+                Take = take,
+                PageNumber = (skip / take) + 1,
+                PageSize = take,
+                HasNextPage = hasNextPage,
+                NextSkip = hasNextPage ? skip + take : null,
+                HasMore = hasNextPage,
+                IsInitial = skip == 0
+            };
+        }
 
         public async Task<ChatNest.Shared.DTOs.ChatMessagesPageResponse> GetChatMessagesByDayAsync(
             string userId,
@@ -379,7 +417,7 @@ namespace ChatNest.Services.Concrete
                     ChatId = chatId.ToString(),
                     ChatType = chat.ChatType,
                     TotalCount = total,
-                    Messages = Array.Empty<Message>(),
+                    Messages = Array.Empty<MessageDto>(),
                     DayStartUtc = null,
                     NextCursorUtc = null,
                     HasMore = false,
@@ -398,7 +436,7 @@ namespace ChatNest.Services.Concrete
                 ChatId = chatId.ToString(),
                 ChatType = chat.ChatType,
                 TotalCount = total,
-                Messages = messages,
+                Messages = _mapper.Map<IEnumerable<MessageDto>>(messages),
                 DayStartUtc = dayStartUtc,
                 NextCursorUtc = hasMore ? dayStartUtc : null,
                 HasMore = hasMore,

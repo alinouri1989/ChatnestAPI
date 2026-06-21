@@ -1,4 +1,4 @@
-﻿using ChatNest.Entities.Enums;
+using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
 
 public interface ICallService
@@ -9,6 +9,8 @@ public interface ICallService
     Task DeleteCallAsync(string userId, string callId);
     Task<List<string>> GetCallParticipantsAsync(string userId, string callId);
     Task<(Dictionary<string, Dictionary<string, Call>>, List<string>)> GetCallLogsAsync(string userId); // Made async
+    Task<(Dictionary<string, Dictionary<string, Call>>, List<string>, int)> GetCallLogsAsync(string userId, int skip, int take);
+    Task<int> GetUserCallsCountAsync(string userId);
     Task<Call> GetCallAsync(string userId, string callId);
 
     // New methods

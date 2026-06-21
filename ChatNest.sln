@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35527.113
@@ -15,12 +15,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatNest.Core", "ChatNest.C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatNest.Shared", "ChatNest.Shared\ChatNest.Shared.csproj", "{88F12DF8-4B0C-45E9-9A28-625A55A49566}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatNest.Tests", "ChatNest.Tests\ChatNest.Tests.csproj", "{3D5C7A4C-6029-4C82-9AC7-F07FD41A420D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3D5C7A4C-6029-4C82-9AC7-F07FD41A420D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D5C7A4C-6029-4C82-9AC7-F07FD41A420D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D5C7A4C-6029-4C82-9AC7-F07FD41A420D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D5C7A4C-6029-4C82-9AC7-F07FD41A420D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4EE6FED1-E8F1-470B-9F64-C7F5DF438783}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4EE6FED1-E8F1-470B-9F64-C7F5DF438783}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4EE6FED1-E8F1-470B-9F64-C7F5DF438783}.Release|Any CPU.ActiveCfg = Release|Any CPU

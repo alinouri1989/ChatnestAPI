@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using ChatNest.Entities.Enums;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Exceptions;
@@ -148,7 +148,17 @@ namespace ChatNest.Services.Concrete
 
         public async Task<(Dictionary<string, Dictionary<string, Call>>, List<string>)> GetCallLogsAsync(string userId)
         {
-            var userCalls = await _callRepository.GetUserCallsAsync(userId);
+            var (calls, participants, _) = await GetCallLogsAsync(userId, 0, 100);
+            return (calls, participants);
+        }
+
+        public async Task<(Dictionary<string, Dictionary<string, Call>>, List<string>, int)> GetCallLogsAsync(string userId, int skip, int take)
+        {
+            skip = Math.Max(0, skip);
+            take = Math.Clamp(take, 1, 100);
+
+            var total = await _callRepository.GetUserCallsCountAsync(userId);
+            var userCalls = await _callRepository.GetUserCallsAsync(userId, skip, take);
 
             // Filter out calls that are deleted for this user
             var visibleCalls = userCalls.Where(c => !c.DeletedFor.ContainsKey(userId)).ToList();
@@ -159,17 +169,18 @@ namespace ChatNest.Services.Concrete
                 { "calls", callDict }
             };
 
-            // Get all participants from the visible calls
-            var allParticipants = new List<string>();
-            foreach (var call in visibleCalls)
-            {
-                var participants = call.CallParticipants.Select(cp => cp.UserId).ToList();
-                allParticipants.AddRange(participants);
-            }
+            var uniqueParticipants = visibleCalls
+                .SelectMany(call => call.CallParticipants.Select(cp => cp.UserId))
+                .Distinct()
+                .Where(p => p != userId)
+                .ToList();
 
-            var uniqueParticipants = allParticipants.Distinct().Where(p => p != userId).ToList();
+            return (result, uniqueParticipants, total);
+        }
 
-            return (result, uniqueParticipants);
+        public async Task<int> GetUserCallsCountAsync(string userId)
+        {
+            return await _callRepository.GetUserCallsCountAsync(userId);
         }
 
         public async Task<Call> GetCallAsync(string userId, string callId)

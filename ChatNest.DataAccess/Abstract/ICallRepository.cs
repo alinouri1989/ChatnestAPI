@@ -1,4 +1,4 @@
-﻿using ChatNest.Entities.Models;
+using ChatNest.Entities.Models;
 
 public interface ICallRepository
 {
@@ -6,6 +6,8 @@ public interface ICallRepository
     Task<Call?> GetCallByIdAsync(Guid id);
     Task<List<Call>> GetCallsByUserIdAsync(string userId);
     Task<IEnumerable<Call>> GetUserCallsAsync(string userId);
+    Task<IEnumerable<Call>> GetUserCallsAsync(string userId, int skip, int take);
+    Task<int> GetUserCallsCountAsync(string userId);
     Task<Call> UpdateCallAsync(Call call);
     Task DeleteCallAsync(Guid id);
 

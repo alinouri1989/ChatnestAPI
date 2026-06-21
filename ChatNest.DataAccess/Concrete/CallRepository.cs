@@ -1,4 +1,4 @@
-﻿using ChatNest.DataAccess.Contexts;
+using ChatNest.DataAccess.Contexts;
 using ChatNest.Entities.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,12 +39,28 @@ public class CallRepository : ICallRepository
 
     public async Task<IEnumerable<Call>> GetUserCallsAsync(string userId)
     {
+        return await GetUserCallsAsync(userId, 0, int.MaxValue);
+    }
+
+    public async Task<IEnumerable<Call>> GetUserCallsAsync(string userId, int skip, int take)
+    {
+        skip = Math.Max(0, skip);
+        take = Math.Clamp(take, 1, 100);
+
         return await _context.Calls
             .Include(c => c.Chat)
             .Include(c => c.CallParticipants)
             .Where(c => c.CallParticipants.Any(cp => cp.UserId == userId))
             .OrderByDescending(c => c.CreatedDate)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync();
+    }
+
+    public async Task<int> GetUserCallsCountAsync(string userId)
+    {
+        return await _context.Calls
+            .CountAsync(c => c.CallParticipants.Any(cp => cp.UserId == userId));
     }
 
     public async Task<Call> UpdateCallAsync(Call call)

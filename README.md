@@ -1,5 +1,6 @@
 ﻿![ChatNestAllDevicesBanner 1 (2)](https://github.com/user-attachments/assets/ac66ba94-dad3-450a-b085-5011af846bab)
 
+dotnet run --project .\ChatNest.API\ChatNest.API.csproj --launch-profile https
 
 ### ðŸŽ¯ Project Purpose  
 

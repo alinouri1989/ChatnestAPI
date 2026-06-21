@@ -68,11 +68,19 @@ namespace ChatNest.Services.Mapping
             // User => CallerUser
             CreateMap<User, CallerUser>();
 
-            CreateMap<User, UserDto>().ReverseMap();
+            CreateMap<User, UserDto>()
+                .ForMember(dest => dest.CreatedGroups, opt => opt.Ignore())
+                .ForMember(dest => dest.RefreshTokens, opt => opt.Ignore())
+                .ReverseMap();
             CreateMap<Chat, ChatDto>().ReverseMap();
-            CreateMap<ChatParticipant, ChatParticipantDto>().ReverseMap();
+            CreateMap<ChatParticipant, ChatParticipantDto>()
+                .ForMember(dest => dest.Chat, opt => opt.Ignore())
+                .ForMember(dest => dest.User, opt => opt.Ignore())
+                .ReverseMap();
             CreateMap<Group, GroupDto>().ReverseMap();
-            CreateMap<Message, MessageDto>().ReverseMap();
+            CreateMap<Message, MessageDto>()
+                .ForMember(dest => dest.Chat, opt => opt.Ignore())
+                .ReverseMap();
             CreateMap<RefreshToken, RefreshTokenDto>().ReverseMap();
 
             CreateMap<Group, GroupProfile>()

@@ -1,4 +1,5 @@
 ﻿using ChatNest.Entities.Models;
+using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
 
 namespace ChatNest.Services.Abstract
@@ -63,7 +64,17 @@ namespace ChatNest.Services.Abstract
         /// <param name="skip"></param>
         /// <param name="take"></param>
         /// <returns></returns>
-        Task<IEnumerable<Message>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5);
+        Task<IEnumerable<MessageDto>> GetChatMessagesAsync(Guid chatId, int skip = 0, int take = 5);
+
+        /// <summary>
+        /// دریافت پیام های یک گفتگو بر اساس تعداد پیام ها
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="chatId"></param>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
+        Task<ChatNest.Shared.DTOs.ChatMessagesPageResponse> GetChatMessagesPageAsync(string userId, Guid chatId, int skip = 0, int take = 50);
 
         /// <summary>
         /// دریافت پیام های یک گفتگو به صورت روز به روز (از جدیدترین روز به قدیمی تر)
