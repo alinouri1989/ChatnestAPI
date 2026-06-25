@@ -83,7 +83,32 @@ namespace ChatNest.Services.Concrete
             return chat;
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> SendMessageAsync(
+        private Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>> CreateMessagePayload(
+            string chatType,
+            string chatId,
+            Message message)
+        {
+            var messageDto = _mapper.Map<MessageDto>(message);
+
+            return new Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>>
+            {
+                {
+                    chatType,
+                    new Dictionary<string, Dictionary<string, MessageDto>>
+                    {
+                        {
+                            chatId,
+                            new Dictionary<string, MessageDto>
+                            {
+                                { message.Id.ToString(), messageDto }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>>, List<string>)> SendMessageAsync(
             string userId, string chatId, string chatType, SendMessage dto)
         {
             var chat = await GetWritableChatAsync(userId, chatId, chatType);
@@ -189,15 +214,10 @@ namespace ChatNest.Services.Concrete
 
             await _messageRepository.CreateMessageAsync(message);
 
-            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-            {
-                { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { message.Id.ToString(), message } } } } }
-            };
-
-            return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
+            return (CreateMessagePayload(chatType, chatId, message), chat.ChatParticipants.Select(c => c.UserId).ToList());
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> ForwardAttachmentAsync(
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>>, List<string>)> ForwardAttachmentAsync(
             string userId,
             string sourceMessageId,
             string targetChatId,
@@ -244,27 +264,10 @@ namespace ChatNest.Services.Concrete
 
             await _messageRepository.CreateMessageAsync(forwardedMessage);
 
-            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-            {
-                {
-                    targetChatType,
-                    new Dictionary<string, Dictionary<string, Message>>
-                    {
-                        {
-                            targetChatId,
-                            new Dictionary<string, Message>
-                            {
-                                { forwardedMessage.Id.ToString(), forwardedMessage }
-                            }
-                        }
-                    }
-                }
-            };
-
-            return (result, targetChat.ChatParticipants.Select(c => c.UserId).ToList());
+            return (CreateMessagePayload(targetChatType, targetChatId, forwardedMessage), targetChat.ChatParticipants.Select(c => c.UserId).ToList());
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeleteMessageAsync(
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>>, List<string>)> DeleteMessageAsync(
             string userId, string chatType, string chatId, string messageId, byte deletionType)
         {
             var parsedChatId = ParseRequiredGuid(chatId, "chat id");
@@ -296,12 +299,7 @@ namespace ChatNest.Services.Concrete
                     DeletedFor = chat.ChatParticipants.ToDictionary(participant => participant.UserId, _ => deletedAt)
                 };
 
-                var deletedMessageResult = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-                {
-                    { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, deleteMarker } } } } }
-                };
-
-                return (deletedMessageResult, chat.ChatParticipants.Select(c => c.UserId).ToList());
+                return (CreateMessagePayload(chatType, chatId, deleteMarker), chat.ChatParticipants.Select(c => c.UserId).ToList());
             }
 
             // Delete for me only
@@ -312,21 +310,18 @@ namespace ChatNest.Services.Concrete
                 await _messageRepository.UpdateMessageDeletedForAsync(parsedMessageId, deletedFor);
 
                 var updatedMessage = await _messageRepository.GetMessageByIdAsync(parsedMessageId);
-                var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>();
+                var result = new Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>>();
 
                 if (updatedMessage != null)
                 {
-                    result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-                    {
-                        { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage } } } } }
-                    };
+                    result = CreateMessagePayload(chatType, chatId, updatedMessage);
                 }
 
                 return (result, new List<string> { userId });
             }
         }
 
-        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, Message>>>, List<string>)> DeliverOrReadMessageAsync(
+        public async Task<(Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>>, List<string>)> DeliverOrReadMessageAsync(
             string userId, string chatType, string chatId, string messageId, string fieldName)
         {
             var parsedChatId = ParseRequiredGuid(chatId, "chat id");
@@ -345,12 +340,7 @@ namespace ChatNest.Services.Concrete
             if (updatedMessage == null)
                 throw new NotFoundException("پیام یافت نشد");
 
-            var result = new Dictionary<string, Dictionary<string, Dictionary<string, Message>>>
-            {
-                { chatType, new Dictionary<string, Dictionary<string, Message>> { { chatId, new Dictionary<string, Message> { { messageId, updatedMessage } } } } }
-            };
-
-            return (result, chat.ChatParticipants.Select(c => c.UserId).ToList());
+            return (CreateMessagePayload(chatType, chatId, updatedMessage), chat.ChatParticipants.Select(c => c.UserId).ToList());
         }
 
         public async Task<int> GetTotalMessageCountAsync(Guid chatId)

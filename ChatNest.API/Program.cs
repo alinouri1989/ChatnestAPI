@@ -269,11 +269,26 @@ try
 
     var app = builder.Build();
 
-    Log.Information("Applying database migrations");
-    await app.Services.MigrateDatabaseAsync();
-    Log.Information("Database migrations applied");
+    try
+    {
+        Log.Information("Applying database migrations");
+        await app.Services.MigrateDatabaseAsync();
+        Log.Information("Database migrations applied");
+    }
+    catch (Exception ex)
+    {
+        // Log and continue to avoid crashing the app during startup (e.g. when DB is not available)
+        Log.Error(ex, "Database migration failed, continuing without migration");
+    }
 
-    await app.Services.SeedIdentityDataAsync();
+    try
+    {
+        await app.Services.SeedIdentityDataAsync();
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Seeding identity data failed, continuing without seeding");
+    }
 
     app.UseSerilogRequestLogging();
 

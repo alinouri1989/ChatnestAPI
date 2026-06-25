@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Disable analyzers during build to avoid Edit-and-Continue diagnostics (ENC0085) in CI/build environment -->
+    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,8 +19,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-	  <PackageReference Include="SixLabors.ImageSharp" Version="4.0.0" />
-	  <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.1" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="4.0.0" />
+	  <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,6 +32,7 @@
 
   <ItemGroup>
     <Folder Include="Logs\" />
+    <Folder Include="Swagger\" />
   </ItemGroup>
 
 </Project>

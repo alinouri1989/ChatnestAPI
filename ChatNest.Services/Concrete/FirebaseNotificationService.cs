@@ -11,6 +11,7 @@ namespace ChatNest.Services.Concrete;
 
 public sealed class FirebaseNotificationService : INotificationService
 {
+    private static readonly object FirebaseInitializationLock = new();
     private readonly IUserRepository _userRepository;
     private readonly ILogger<FirebaseNotificationService> _logger;
     private readonly bool _isEnabled;
@@ -200,48 +201,67 @@ public sealed class FirebaseNotificationService : INotificationService
 
     private bool InitializeFirebase(IConfiguration configuration)
     {
-        if (FirebaseApp.DefaultInstance != null)
-            return true;
+        lock (FirebaseInitializationLock)
+        {
+            if (TryGetDefaultFirebaseApp() != null)
+                return true;
 
-        var serviceAccountJson = configuration["Firebase:ServiceAccountJson"];
-        var serviceAccountPath = configuration["Firebase:ServiceAccountPath"];
-        var serviceAccountSection = configuration.GetSection("Firebase:ServiceAccount");
+            var serviceAccountJson = configuration["Firebase:ServiceAccountJson"];
+            var serviceAccountPath = configuration["Firebase:ServiceAccountPath"];
+            var serviceAccountSection = configuration.GetSection("Firebase:ServiceAccount");
 
+            try
+            {
+                GoogleCredential credential;
+                if (!string.IsNullOrWhiteSpace(serviceAccountJson))
+                {
+                    credential = GoogleCredential.FromJson(serviceAccountJson);
+                }
+                else if (serviceAccountSection.Exists())
+                {
+                    var serviceAccount = serviceAccountSection
+                        .GetChildren()
+                        .ToDictionary(section => section.Key, section => section.Value ?? string.Empty);
+                    credential = GoogleCredential.FromJson(JsonSerializer.Serialize(serviceAccount));
+                }
+                else if (!string.IsNullOrWhiteSpace(serviceAccountPath))
+                {
+                    credential = GoogleCredential.FromFile(serviceAccountPath);
+                }
+                else
+                {
+                    credential = GoogleCredential.GetApplicationDefault();
+                }
+
+                FirebaseApp.Create(new AppOptions
+                {
+                    Credential = credential,
+                    ProjectId = configuration["Firebase:ProjectId"]
+                });
+
+                return true;
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("default FirebaseApp already exists", StringComparison.OrdinalIgnoreCase))
+            {
+                return TryGetDefaultFirebaseApp() != null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Firebase Admin was not initialized. Push notifications are disabled.");
+                return false;
+            }
+        }
+    }
+
+    private static FirebaseApp? TryGetDefaultFirebaseApp()
+    {
         try
         {
-            GoogleCredential credential;
-            if (!string.IsNullOrWhiteSpace(serviceAccountJson))
-            {
-                credential = GoogleCredential.FromJson(serviceAccountJson);
-            }
-            else if (serviceAccountSection.Exists())
-            {
-                var serviceAccount = serviceAccountSection
-                    .GetChildren()
-                    .ToDictionary(section => section.Key, section => section.Value ?? string.Empty);
-                credential = GoogleCredential.FromJson(JsonSerializer.Serialize(serviceAccount));
-            }
-            else if (!string.IsNullOrWhiteSpace(serviceAccountPath))
-            {
-                credential = GoogleCredential.FromFile(serviceAccountPath);
-            }
-            else
-            {
-                credential = GoogleCredential.GetApplicationDefault();
-            }
-
-            FirebaseApp.Create(new AppOptions
-            {
-                Credential = credential,
-                ProjectId = configuration["Firebase:ProjectId"]
-            });
-
-            return true;
+            return FirebaseApp.DefaultInstance;
         }
-        catch (Exception ex)
+        catch (InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Firebase Admin was not initialized. Push notifications are disabled.");
-            return false;
+            return null;
         }
     }
 }
