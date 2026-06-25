@@ -204,7 +204,7 @@ try
     var signalRBuilder = builder.Services.AddSignalR(options =>
     {
         // Keep SignalR payloads small; file uploads are chunked.
-        options.MaximumReceiveMessageSize = 2L * 1024 * 1024;
+        options.MaximumReceiveMessageSize = 3L * 1024 * 1024;
         options.EnableDetailedErrors = false;
         options.ClientTimeoutInterval = TimeSpan.FromSeconds(120);
         options.HandshakeTimeout = TimeSpan.FromSeconds(30);

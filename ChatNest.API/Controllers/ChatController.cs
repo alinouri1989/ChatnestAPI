@@ -6,6 +6,7 @@ using ChatNest.Services.Exceptions;
 using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs;
 using ChatNest.Shared.DTOs.Request;
+using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.Globalization;
@@ -21,8 +22,9 @@ namespace ChatNest.API.Controllers
         private readonly IGroupService _groupService;
         private readonly INotificationService _notificationService;
         private readonly IHubContext<ChatHub> _chatHubContext;
+        private readonly IUserPresenceTracker _presenceTracker;
 
-        private const long MaxMessageFileBytes = 200L * 1024 * 1024;
+        private const long MaxMessageFileBytes = 300L * 1024 * 1024;
 
         public ChatController(
             IChatService chatService,
@@ -30,7 +32,8 @@ namespace ChatNest.API.Controllers
             IUserService userService,
             IGroupService groupService,
             INotificationService notificationService,
-            IHubContext<ChatHub> chatHubContext)
+            IHubContext<ChatHub> chatHubContext,
+            IUserPresenceTracker presenceTracker)
         {
             _chatService = chatService;
             _messageService = messageService;
@@ -38,6 +41,7 @@ namespace ChatNest.API.Controllers
             _groupService = groupService;
             _notificationService = notificationService;
             _chatHubContext = chatHubContext;
+            _presenceTracker = presenceTracker;
         }
 
         [HttpGet("Initial")]
@@ -123,6 +127,85 @@ namespace ChatNest.API.Controllers
             return Ok(message);
         }
 
+        [HttpDelete("{chatId}/Messages/{messageId}/ForMe")]
+        public async Task<IActionResult> DeleteMessageForMe(
+            string chatId,
+            string messageId,
+            [FromQuery] string chatType)
+        {
+            return await DeleteMessageAsync(chatId, messageId, chatType, deletionType: 0);
+        }
+
+        [HttpDelete("{chatId}/Messages/{messageId}/ForEveryone")]
+        public async Task<IActionResult> DeleteMessageForEveryone(
+            string chatId,
+            string messageId,
+            [FromQuery] string chatType)
+        {
+            return await DeleteMessageAsync(chatId, messageId, chatType, deletionType: 1);
+        }
+
+        [HttpPost("{chatId}/Messages/ForwardAttachment")]
+        public async Task<IActionResult> ForwardAttachment(
+            string chatId,
+            [FromBody] ForwardAttachmentRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.TargetChatType))
+            {
+                throw new BadRequestException("Chat type is required");
+            }
+
+            var (message, chatParticipants) = await _messageService.ForwardAttachmentAsync(
+                UserId,
+                request.SourceMessageId,
+                chatId,
+                request.TargetChatType);
+
+            await BroadcastMessageAsync(message, chatParticipants);
+            await _notificationService.SendNewMessageNotificationAsync(
+                UserId,
+                chatParticipants,
+                chatId,
+                request.TargetChatType,
+                "Forwarded attachment");
+
+            return Ok(message);
+        }
+
+        [HttpPost("Messages/{sourceMessageId}/ForwardToUser/{recipientId}")]
+        public async Task<IActionResult> ForwardAttachmentToUser(
+            string sourceMessageId,
+            string recipientId)
+        {
+            var chat = await _chatService.CreateChatAsync(UserId, "Individual", recipientId);
+            var targetChatId = await BroadcastIndividualChatAsync(chat);
+
+            if (string.IsNullOrWhiteSpace(targetChatId))
+            {
+                throw new BadRequestException("Target chat could not be resolved");
+            }
+
+            var (message, chatParticipants) = await _messageService.ForwardAttachmentAsync(
+                UserId,
+                sourceMessageId,
+                targetChatId,
+                "Individual");
+
+            await BroadcastMessageAsync(message, chatParticipants);
+            await _notificationService.SendNewMessageNotificationAsync(
+                UserId,
+                chatParticipants,
+                targetChatId,
+                "Individual",
+                "Forwarded attachment");
+
+            return Ok(new
+            {
+                chatId = targetChatId,
+                message
+            });
+        }
+
         [HttpPost("{chatId}/Messages/File")]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(MaxMessageFileBytes)]
@@ -203,6 +286,75 @@ namespace ChatNest.API.Controllers
             foreach (var participant in chatParticipants)
             {
                 await _chatHubContext.Clients.User(participant).SendAsync("ReceiveGetMessages", message);
+            }
+        }
+
+        private async Task<IActionResult> DeleteMessageAsync(
+            string chatId,
+            string messageId,
+            string chatType,
+            byte deletionType)
+        {
+            if (string.IsNullOrWhiteSpace(chatType))
+            {
+                throw new BadRequestException("Chat type is required");
+            }
+
+            var (message, chatParticipants) = await _messageService.DeleteMessageAsync(
+                UserId,
+                chatType,
+                chatId,
+                messageId,
+                deletionType);
+
+            await BroadcastMessageAsync(message, chatParticipants);
+            return Ok(message);
+        }
+
+        private async Task<string?> BroadcastIndividualChatAsync(Dictionary<string, ChatDto> chat)
+        {
+            var chatEntity = chat.Values.FirstOrDefault();
+            if (chatEntity == null)
+            {
+                return null;
+            }
+
+            var chatId = chatEntity.Id.ToString();
+            var chatParticipants = await _chatService.GetChatParticipantsAsync(chatId);
+            var chatResponse = new Dictionary<string, Dictionary<string, ChatDto>> { { "Individual", chat } };
+
+            foreach (var participant in chatParticipants)
+            {
+                await _chatHubContext.Clients.User(participant).SendAsync("ReceiveCreateChat", chatResponse);
+            }
+
+            var recipientProfiles = await _userService.GetRecipientProfilesAsync(chatParticipants);
+            ApplyPresenceState(recipientProfiles);
+
+            foreach (var participant in chatParticipants)
+            {
+                var profileUserId = chatParticipants.FirstOrDefault(p => p != participant) ?? participant;
+                if (!recipientProfiles.TryGetValue(profileUserId, out var profileData))
+                {
+                    continue;
+                }
+
+                await _chatHubContext.Clients.User(participant).SendAsync(
+                    "ReceiveRecipientProfiles",
+                    new Dictionary<string, object>
+                    {
+                        { profileUserId, profileData }
+                    });
+            }
+
+            return chatId;
+        }
+
+        private void ApplyPresenceState(Dictionary<string, RecipientProfile> profiles)
+        {
+            foreach (var (userId, profile) in profiles)
+            {
+                profile.IsOnline = _presenceTracker.IsOnline(userId);
             }
         }
 

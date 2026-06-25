@@ -808,7 +808,7 @@ ReceiveGetMessages(Dictionary<String, Dictionary<String, Dictionary<String, Mess
 
 `BeginFileUpload(chatType: String, chatId: String, contentType: Int, fileName: String, clientMessageId: String?, replyToMessageId: String?): String`
 
-Starts a chunked upload session. `contentType` must not be `Text`. Backend max file size is 200 MB.
+Starts a chunked upload session. `contentType` must not be `Text`. Backend max file size is 300 MB.
 
 `UploadFileChunk(uploadId: String, base64Chunk: String)`
 

@@ -31,7 +31,7 @@ namespace ChatNest.API.Hubs
 
         private static readonly ConcurrentDictionary<string, PendingUploadSession> PendingUploads = new();
         private static readonly TimeSpan PendingUploadTtl = TimeSpan.FromMinutes(20);
-        private const long MaxUploadBytes = 200L * 1024 * 1024;
+        private const long MaxUploadBytes = 300L * 1024 * 1024;
 
         private sealed class PendingUploadSession : IDisposable
         {
@@ -759,7 +759,7 @@ namespace ChatNest.API.Hubs
                 if (session.BytesWritten + chunkBytes.Length > MaxUploadBytes)
                 {
                     PendingUploads.TryRemove(uploadId, out oversizedSession);
-                    throw new BadRequestException("File size exceeds the allowed limit (200MB)");
+                    throw new BadRequestException("File size exceeds the allowed limit (300MB)");
                 }
 
                 await using var fileStream = new FileStream(
@@ -777,7 +777,7 @@ namespace ChatNest.API.Hubs
                 if (session.BytesWritten > MaxUploadBytes)
                 {
                     PendingUploads.TryRemove(uploadId, out oversizedSession);
-                    throw new BadRequestException("File size exceeds the allowed limit (200MB)");
+                    throw new BadRequestException("File size exceeds the allowed limit (300MB)");
                 }
             }
             catch (Exception ex) when (ex is NotFoundException || ex is ForbiddenException || ex is BadRequestException)
