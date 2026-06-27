@@ -79,16 +79,22 @@ public class ChatRepository : IChatRepository
     {
         try
         {
-            return await ApplyGroupIntegrityFilter(_context.Chats)
+            var query = ApplyGroupIntegrityFilter(_context.Chats)
+                .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
+                .OrderByDescending(c =>
+                    c.Messages
+                        .Where(m => m.Content != null && m.Content != DeletedMessageTombstone)
+                        .Select(m => (DateTime?)m.CreatedDate)
+                        .Max() ?? c.CreatedDate)
+                .Skip(skip)
+                .Take(take);
+
+            return await query
                 .Include(c => c.Messages
                     .Where(m => m.Content != null && m.Content != DeletedMessageTombstone)
                     .OrderByDescending(m => m.CreatedDate)
                     .Take(10))
                 .Include(c => c.ChatParticipants)
-                .Where(c => c.ChatParticipants.Any(cp => cp.UserId == userId))
-                .OrderByDescending(c => c.CreatedDate)
-                .Skip(skip)
-                .Take(take)
                 .ToListAsync();
         }
         catch (Exception ex)

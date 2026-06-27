@@ -135,11 +135,6 @@ namespace ChatNest.Services.Concrete
 
                 var orderedChats = userChats
                     .OrderByDescending(c =>
-                        c.Messages.Any(m =>
-                            !m.StatusJson.Contains($"\"Read\":{{\"{userId}\":")
-                        )
-                    )
-                    .ThenByDescending(c =>
                         c.Messages.Any()
                             ? c.Messages.Max(m => m.CreatedDate)
                             : c.CreatedDate
