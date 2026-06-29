@@ -44,6 +44,32 @@ namespace ChatNest.Services.Concrete
             };
         }
 
+        private static MessageItemDto ToMessageItemDto(Message message)
+        {
+            return new MessageItemDto
+            {
+                Id = message.Id,
+                Content = message.Content ?? string.Empty,
+                ThumbnailUrl = message.ThumbnailUrl ?? string.Empty,
+                FileName = message.FileName,
+                FileSize = message.FileSize,
+                Type = message.Type,
+                SenderId = message.SenderId,
+                SenderDisplayName = message.Sender?.DisplayName ?? string.Empty,
+                SenderProfilePhoto = message.Sender?.ProfilePhoto?.ToString(),
+                SenderUserIdentifier = message.Sender?.UserIdentifier,
+                ChatId = message.ChatId,
+                ReplyToMessageId = message.ReplyToMessageId,
+                ReplyToSenderId = message.ReplyToSenderId,
+                ReplyToType = message.ReplyToType,
+                ReplyToContent = message.ReplyToContent,
+                ReplyToFileName = message.ReplyToFileName,
+                Status = message.Status ?? new MessageStatus(),
+                CreatedDate = message.CreatedDate,
+                ClientMessageId = message.ClientMessageId
+            };
+        }
+
         private static Guid ParseRequiredGuid(string value, string parameterName)
         {
             if (Guid.TryParse(value, out var parsed))
@@ -376,7 +402,7 @@ namespace ChatNest.Services.Concrete
                 ChatId = chatId.ToString(),
                 ChatType = chat.ChatType,
                 TotalCount = total,
-                Messages = _mapper.Map<IEnumerable<MessageDto>>(messages),
+                Messages = messages.Select(ToMessageItemDto).ToList(),
                 Skip = skip,
                 Take = take,
                 PageNumber = (skip / take) + 1,
@@ -407,7 +433,7 @@ namespace ChatNest.Services.Concrete
                     ChatId = chatId.ToString(),
                     ChatType = chat.ChatType,
                     TotalCount = total,
-                    Messages = Array.Empty<MessageDto>(),
+                    Messages = Array.Empty<MessageItemDto>(),
                     DayStartUtc = null,
                     NextCursorUtc = null,
                     HasMore = false,
@@ -426,7 +452,7 @@ namespace ChatNest.Services.Concrete
                 ChatId = chatId.ToString(),
                 ChatType = chat.ChatType,
                 TotalCount = total,
-                Messages = _mapper.Map<IEnumerable<MessageDto>>(messages),
+                Messages = messages.Select(ToMessageItemDto).ToList(),
                 DayStartUtc = dayStartUtc,
                 NextCursorUtc = hasMore ? dayStartUtc : null,
                 HasMore = hasMore,

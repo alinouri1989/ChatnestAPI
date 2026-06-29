@@ -57,7 +57,7 @@ namespace ChatNest.API.Controllers
 
             return Ok(new
             {
-                chats = EnsureChatShape(chats),
+                chats = EnsureChatSummaryShape(chats),
                 recipientProfiles,
                 groupProfiles,
                 totalChats,
@@ -377,13 +377,67 @@ namespace ChatNest.API.Controllers
             };
         }
 
-        private static Dictionary<string, Dictionary<string, ChatDto>> EnsureChatShape(
+        private static MessageItemDto ToMessageItemDto(MessageDto message)
+        {
+            return new MessageItemDto
+            {
+                Id = message.Id,
+                Content = message.Content,
+                ThumbnailUrl = message.ThumbnailUrl,
+                FileName = message.FileName,
+                FileSize = message.FileSize,
+                Type = message.Type,
+                SenderId = message.SenderId,
+                SenderDisplayName = message.Sender?.DisplayName ?? string.Empty,
+                SenderProfilePhoto = message.Sender?.ProfilePhoto?.ToString(),
+                SenderUserIdentifier = message.Sender?.UserIdentifier,
+                ChatId = message.ChatId,
+                ReplyToMessageId = message.ReplyToMessageId,
+                ReplyToSenderId = message.ReplyToSenderId,
+                ReplyToType = message.ReplyToType,
+                ReplyToContent = message.ReplyToContent,
+                ReplyToFileName = message.ReplyToFileName,
+                Status = message.Status,
+                CreatedDate = message.CreatedDate,
+                ClientMessageId = message.ClientMessageId
+            };
+        }
+
+        private static ChatSummaryDto ToChatSummaryDto(ChatDto chat)
+        {
+            var lastMessage = chat.Messages
+                .OrderByDescending(message => message.CreatedDate)
+                .FirstOrDefault();
+
+            return new ChatSummaryDto
+            {
+                Id = chat.Id,
+                ChatType = chat.ChatType,
+                CreatedDate = chat.CreatedDate,
+                ArchivedFor = chat.ArchivedFor,
+                LastMessage = lastMessage == null ? null : ToMessageItemDto(lastMessage),
+                ParticipantIds = chat.ChatParticipants
+                    .Select(participant => participant.UserId)
+                    .Where(userId => !string.IsNullOrWhiteSpace(userId))
+                    .Distinct()
+                    .ToList()
+            };
+        }
+
+        private static Dictionary<string, Dictionary<string, ChatSummaryDto>> EnsureChatSummaryShape(
             Dictionary<string, Dictionary<string, ChatDto>>? chats)
         {
             chats ??= new Dictionary<string, Dictionary<string, ChatDto>>();
-            chats.TryAdd("Individual", new Dictionary<string, ChatDto>());
-            chats.TryAdd("Group", new Dictionary<string, ChatDto>());
-            return chats;
+
+            var summaries = chats.ToDictionary(
+                group => group.Key,
+                group => group.Value.ToDictionary(
+                    chat => chat.Key,
+                    chat => ToChatSummaryDto(chat.Value)));
+
+            summaries.TryAdd("Individual", new Dictionary<string, ChatSummaryDto>());
+            summaries.TryAdd("Group", new Dictionary<string, ChatSummaryDto>());
+            return summaries;
         }
     }
 }

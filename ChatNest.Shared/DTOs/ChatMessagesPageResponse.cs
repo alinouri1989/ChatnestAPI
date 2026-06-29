@@ -5,7 +5,7 @@ namespace ChatNest.Shared.DTOs
         public string ChatId { get; init; } = string.Empty;
         public string ChatType { get; init; } = string.Empty;
         public int TotalCount { get; init; }
-        public IEnumerable<MessageDto> Messages { get; init; } = Array.Empty<MessageDto>();
+        public IEnumerable<MessageItemDto> Messages { get; init; } = Array.Empty<MessageItemDto>();
         public int Skip { get; init; }
         public int Take { get; init; }
         public int PageNumber { get; init; } = 1;
