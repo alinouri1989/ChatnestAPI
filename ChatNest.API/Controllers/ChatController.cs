@@ -124,7 +124,7 @@ namespace ChatNest.API.Controllers
                 chatType,
                 CreateNotificationPreview(dto.ContentType, chatId, dto.FileName, dto.Content));
 
-            return Ok(message);
+            return Ok(new { accepted = true });
         }
 
         [HttpDelete("{chatId}/Messages/{messageId}/ForMe")]
