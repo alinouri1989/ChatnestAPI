@@ -21,6 +21,14 @@ https://10.0.2.2:7042
 
 Production should use the deployed HTTPS API origin.
 
+## Current Client Architecture
+
+The current service/UI contract is REST-first for data loading and message mutations:
+
+- Use REST for initial chat pages, message history, call logs, text messages, file messages, attachment forwarding, and message deletion.
+- Keep SignalR connected for realtime events: new message broadcasts, ack/read delivery state, typing, presence, notifications, group/profile updates, and call signaling.
+- Do not use SignalR as the primary source for chat/message history in new Android code. Some legacy hub read methods still exist for compatibility, but the web UI has moved active loading to REST.
+
 ## Authentication
 
 Most REST endpoints and all SignalR hubs require JWT bearer authentication.
@@ -507,6 +515,190 @@ Sends ReceiveGroupProfiles to participants through NotificationHub.
 
 Current user leaves the group.
 
+### Chat
+
+All `Chat` endpoints are authorized. These REST endpoints are the preferred Android API for chat list loading, message history, and message mutations. SignalR should still be connected so the client receives the broadcast events caused by these REST actions.
+
+`GET /api/Chat/Initial?skip=0&take=20`
+
+Returns a paged chat list plus profile dictionaries.
+
+```json
+{
+  "chats": {
+    "Individual": {},
+    "Group": {}
+  },
+  "recipientProfiles": {},
+  "groupProfiles": {},
+  "totalChats": 42,
+  "skip": 0,
+  "take": 20,
+  "hasMore": true
+}
+```
+
+`take` is clamped server-side to `1..100`.
+
+`GET /api/Chat/Total`
+
+Returns the current user's total chat count as a number.
+
+`GET /api/Chat/{chatId}/Messages?skip=0&take=50`
+
+Returns a paged message response:
+
+```json
+{
+  "chatId": "guid",
+  "chatType": "Individual",
+  "totalCount": 100,
+  "messages": [],
+  "skip": 0,
+  "take": 50,
+  "nextSkip": 50,
+  "hasNextPage": true,
+  "isInitial": true
+}
+```
+
+`GET /api/Chat/{chatId}/MessagesByDay?beforeUtc=2026-06-13T00:00:00Z`
+
+Returns one day of messages before the optional UTC cursor. Use `nextCursorUtc` from the previous response to load older days.
+
+```json
+{
+  "chatId": "guid",
+  "chatType": "Individual",
+  "totalCount": 100,
+  "messages": [],
+  "dayStartUtc": "2026-06-13T00:00:00Z",
+  "nextCursorUtc": "2026-06-12T00:00:00Z",
+  "hasMore": true,
+  "isInitial": true
+}
+```
+
+`POST /api/Chat/{chatId}/Messages?chatType=Individual`
+
+Sends a text message through REST and broadcasts `ReceiveGetMessages` to participants through `ChatHub`.
+
+```json
+{
+  "contentType": 0,
+  "content": "<encrypted-message-content>",
+  "clientMessageId": "android-local-id",
+  "replyToMessageId": null,
+  "thumbnailUrl": ""
+}
+```
+
+Success returns the created message envelope.
+
+`POST /api/Chat/{chatId}/Messages/File`
+
+Sends a non-text file message as `multipart/form-data`. Backend max file size is 300 MB.
+
+```text
+chatType=Individual
+contentType=1
+file=<binary file part>
+clientMessageId=android-local-id
+replyToMessageId=<optional message id>
+```
+
+`contentType` must be one of the non-text `MessageContent` enum values.
+
+`DELETE /api/Chat/{chatId}/Messages/{messageId}/ForMe?chatType=Individual`
+
+Deletes a message for the current user and broadcasts the updated message envelope.
+
+`DELETE /api/Chat/{chatId}/Messages/{messageId}/ForEveryone?chatType=Individual`
+
+Deletes a message for everyone. Only the sender can delete for everyone.
+
+`POST /api/Chat/{chatId}/Messages/ForwardAttachment`
+
+Forwards an existing attachment message to an existing chat.
+
+```json
+{
+  "sourceMessageId": "message-guid",
+  "targetChatType": "Individual"
+}
+```
+
+`POST /api/Chat/Messages/{sourceMessageId}/ForwardToUser/{recipientId}`
+
+Creates or reuses an individual chat with the recipient, forwards the attachment, broadcasts chat/message events, and returns:
+
+```json
+{
+  "chatId": "target-chat-guid",
+  "message": {}
+}
+```
+
+Retrofit outline:
+
+```kotlin
+interface ChatApi {
+    @GET("api/Chat/Initial")
+    suspend fun initialChats(
+        @Query("skip") skip: Int = 0,
+        @Query("take") take: Int = 20
+    ): ChatInitialResponse
+
+    @GET("api/Chat/{chatId}/Messages")
+    suspend fun messages(
+        @Path("chatId") chatId: String,
+        @Query("skip") skip: Int = 0,
+        @Query("take") take: Int = 50
+    ): ChatMessagesPageResponse
+
+    @POST("api/Chat/{chatId}/Messages")
+    suspend fun sendTextMessage(
+        @Path("chatId") chatId: String,
+        @Query("chatType") chatType: String,
+        @Body body: SendMessageRequest
+    ): Map<String, Any>
+
+    @Multipart
+    @POST("api/Chat/{chatId}/Messages/File")
+    suspend fun sendFileMessage(
+        @Path("chatId") chatId: String,
+        @Part("chatType") chatType: RequestBody,
+        @Part("contentType") contentType: RequestBody,
+        @Part file: MultipartBody.Part,
+        @Part("clientMessageId") clientMessageId: RequestBody?,
+        @Part("replyToMessageId") replyToMessageId: RequestBody?
+    ): Map<String, Any>
+}
+```
+
+### Call REST
+
+All `Call` endpoints are authorized. Use these endpoints for call-log history; keep `CallHub` for realtime call lifecycle and LiveKit token flow.
+
+`GET /api/Call?skip=0&take=20`
+
+Returns paged call logs and recipient profiles.
+
+```json
+{
+  "calls": {},
+  "recipientProfiles": {},
+  "totalCalls": 20,
+  "skip": 0,
+  "take": 20,
+  "hasMore": false
+}
+```
+
+`GET /api/Call/Total`
+
+Returns the current user's total call count as a number.
+
 ### Generative AI
 
 All `GenerativeAi` endpoints are authorized.
@@ -555,7 +747,28 @@ Example:
 GET /api/Media/messages/message_2f7f...
 ```
 
-The backend sets `Cache-Control: no-store, no-cache, must-revalidate`.
+The backend supports range requests and conditional private caching:
+
+```text
+ETag: "<folder-publicId-size-updatedTicks>"
+Last-Modified: <http-date>
+Cache-Control: private, max-age=31536000, immutable   # message media
+Cache-Control: private, max-age=300, must-revalidate  # other media
+```
+
+If Android sends `If-None-Match` or `If-Modified-Since` and the file is still fresh, the server returns `304 Not Modified`. Message media under the `messages` folder is treated as immutable for one year. Other folders, such as mutable profile/group media, are cached for five minutes and must be revalidated.
+
+OkHttp honors these headers when an HTTP cache is configured:
+
+```kotlin
+val cacheSizeBytes = 100L * 1024L * 1024L
+val okHttpClient = OkHttpClient.Builder()
+    .cache(Cache(File(context.cacheDir, "chatnest-http"), cacheSizeBytes))
+    .addInterceptor(BearerInterceptor(tokenProvider))
+    .build()
+```
+
+Do not cache authenticated API JSON responses containing private chat/user data in a shared cache. Keep media caching separate from local encrypted message storage.
 
 ## Core Response Models
 
@@ -681,9 +894,11 @@ class ChatNestRealtime(
 
 ## ChatHub Contract
 
-Client invokes server methods on `/hub/Chat`.
+Client invokes realtime methods on `/hub/Chat`. New Android code should use the REST `Chat` endpoints above for initial chat pages, message history, text/file sends, forwarding, and deletes. Keep the hub connected to receive realtime broadcasts and to send typing/delivery/read events.
 
 ### Server Methods
+
+The following read methods still exist for compatibility with older clients. Prefer REST in new code:
 
 `Initial(skip: Int = 0, take: Int = 5)`
 
@@ -726,7 +941,7 @@ ReceiveChatMessages({
 
 `GetChatMessagesByDayAsync(chatId: String, beforeUtc: String? = null)`
 
-Use this for day-based pagination. `beforeUtc` should be an ISO UTC date cursor from the previous response.
+Legacy hub equivalent for day-based pagination. Prefer `GET /api/Chat/{chatId}/MessagesByDay?beforeUtc=` in new Android code.
 
 Emits:
 
@@ -742,6 +957,8 @@ Emits:
   "isInitial": true
 }
 ```
+
+Realtime chat actions:
 
 `CreateChat(chatType: String, recipientId: String)`
 
@@ -786,6 +1003,8 @@ ReceiveUnarchiveChat(Dictionary<String, Dictionary<String, Dictionary<String, Da
 
 `SendMessage(chatType: String, chatId: String, dto: SendMessage)`
 
+Legacy hub send method. Prefer `POST /api/Chat/{chatId}/Messages?chatType=` in new Android code so Android matches the current web UI service flow.
+
 Text example:
 
 ```json
@@ -808,7 +1027,7 @@ ReceiveGetMessages(Dictionary<String, Dictionary<String, Dictionary<String, Mess
 
 `BeginFileUpload(chatType: String, chatId: String, contentType: Int, fileName: String, clientMessageId: String?, replyToMessageId: String?): String`
 
-Starts a chunked upload session. `contentType` must not be `Text`. Backend max file size is 300 MB.
+Legacy chunked upload flow. Prefer `POST /api/Chat/{chatId}/Messages/File` with `multipart/form-data` in new Android code. `contentType` must not be `Text`. Backend max file size is 300 MB.
 
 `UploadFileChunk(uploadId: String, base64Chunk: String)`
 
@@ -828,11 +1047,11 @@ Cancels a pending upload. No event is emitted.
 
 `ForwardAttachment(targetChatType: String, targetChatId: String, sourceMessageId: String)`
 
-Forwards an existing non-text attachment to an existing chat.
+Legacy hub attachment forward. Prefer `POST /api/Chat/{chatId}/Messages/ForwardAttachment`.
 
 `ForwardAttachmentToUser(recipientId: String, sourceMessageId: String)`
 
-Creates or reuses an individual chat, then forwards an existing attachment to that user.
+Legacy hub attachment forward. Prefer `POST /api/Chat/Messages/{sourceMessageId}/ForwardToUser/{recipientId}`.
 
 `DeliverMessage(chatType: String, chatId: String, messageId: String)`
 
@@ -844,7 +1063,7 @@ Marks the message read by current user and emits updated message data.
 
 `DeleteMessage(chatType: String, chatId: String, messageId: String, deletionType: Byte)`
 
-`deletionType = 1` deletes for everyone and only sender can do it. Other values delete for current user only.
+Legacy hub delete. Prefer the REST `ForMe` and `ForEveryone` delete endpoints. `deletionType = 1` deletes for everyone and only sender can do it. Other values delete for current user only.
 
 `JoinGroup(groupId: String)`
 
@@ -914,23 +1133,25 @@ chatHub.on("ReceiveGetMessages", { data: Map<String, Any> ->
     // data["Individual"] or data["Group"]
 }, object : TypeReference<Map<String, Any>>() {}.type)
 
-chatHub.send("Initial", 0, 20)
 chatHub.send("CreateChat", "Individual", recipientUserId)
-chatHub.send(
-    "SendMessage",
-    "Individual",
+
+// Load pages and send messages through REST:
+chatApi.initialChats(skip = 0, take = 20)
+chatApi.messages(chatId, skip = 0, take = 50)
+chatApi.sendTextMessage(
     chatId,
-    mapOf(
-        "contentType" to 0,
-        "content" to "Hello from Android",
-        "clientMessageId" to UUID.randomUUID().toString(),
-        "replyToMessageId" to null,
-        "thumbnailUrl" to ""
+    "Individual",
+    SendMessageRequest(
+        contentType = 0,
+        content = encryptedMessage,
+        clientMessageId = UUID.randomUUID().toString(),
+        replyToMessageId = null,
+        thumbnailUrl = ""
     )
 )
 ```
 
-Chunked upload:
+Legacy chunked upload:
 
 ```kotlin
 val uploadId = chatHub
@@ -1026,7 +1247,7 @@ SignalR manages call lifecycle and signaling. LiveKit media sessions are joined 
 
 `Initial()`
 
-Loads call logs and user profiles.
+Legacy hub call-log load. Prefer `GET /api/Call?skip=&take=` for new Android code.
 
 Emits:
 
@@ -1247,10 +1468,14 @@ class BearerInterceptor(private val tokenProvider: () -> String?) : Interceptor 
 1. Connect to `NotificationHub` first so presence updates are tracked early.
 2. Register all SignalR handlers before calling `start()`.
 3. Keep the JWT in encrypted storage and refresh/re-login before reconnecting after token expiry.
-4. Treat all nested SignalR dictionaries as maps keyed by ids: chat type, chat id, message id, user id.
-5. Prefer `clientMessageId` for optimistic UI reconciliation after `ReceiveGetMessages`.
-6. Use chunked upload for large files instead of sending one huge base64 string in `SendMessage`.
-7. For channel groups (`GroupKind.Channel`), only admins can send messages.
-8. For self-chat, call `GetOrCreateSavedMessagesChat()`.
-9. Call `UpdateTypingStatus(chatId, true/false)` with debouncing.
-10. Use `ReadMessage` when a message becomes visible and `DeliverMessage` when it arrives locally.
+4. Load chats, message history, and call logs through REST, not SignalR.
+5. Send text messages, file messages, attachment forwards, and deletes through REST; keep listening for `ReceiveGetMessages` to reconcile realtime state.
+6. Treat all nested SignalR dictionaries as maps keyed by ids: chat type, chat id, message id, user id.
+7. Prefer `clientMessageId` for optimistic UI reconciliation after `ReceiveGetMessages`.
+8. Use multipart REST file upload for new Android code. Use hub chunked upload only for legacy clients that cannot send multipart files.
+9. Configure an OkHttp media cache so `/api/Media/...` can reuse `ETag`, `Last-Modified`, range requests, and `304 Not Modified`.
+10. The web UI service worker cache version is web-only. Android should use its own HTTP/media cache and must not cache authenticated chat JSON in a shared browser-style app shell cache.
+11. For channel groups (`GroupKind.Channel`), only admins can send messages.
+12. For self-chat, call `GetOrCreateSavedMessagesChat()`.
+13. Call `UpdateTypingStatus(chatId, true/false)` with debouncing.
+14. Use `ReadMessage` when a message becomes visible and `DeliverMessage` when it arrives locally.
