@@ -315,7 +315,9 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
             memoryStream.ToArray(),
             metadata.ContentType,
             metadata.OriginalFileName,
-            metadata.ThumbnailUri?.ToString()
+            metadata.ThumbnailUri?.ToString(),
+            metadata.Size,
+            metadata.UpdatedAtUtc
         );
     }
 
