@@ -9,6 +9,7 @@ using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using SixLabors.ImageSharp;
 using System.Globalization;
 
 namespace ChatNest.API.Controllers
@@ -57,7 +58,7 @@ namespace ChatNest.API.Controllers
 
             return Ok(new
             {
-                chats = EnsureChatShape(chats),
+                chats = EnsureChatSummaryShape(chats),
                 recipientProfiles,
                 groupProfiles,
                 totalChats,
@@ -124,7 +125,7 @@ namespace ChatNest.API.Controllers
                 chatType,
                 CreateNotificationPreview(dto.ContentType, chatId, dto.FileName, dto.Content));
 
-            return Ok(message);
+            return Ok(new { accepted = true });
         }
 
         [HttpDelete("{chatId}/Messages/{messageId}/ForMe")]
@@ -237,18 +238,32 @@ namespace ChatNest.API.Controllers
             await using var stream = request.File.OpenReadStream();
             using var memoryStream = new MemoryStream();
             await stream.CopyToAsync(memoryStream);
+            var fileBytes = memoryStream.ToArray();
+
+            ValidateUploadedFileContent(request.ContentType, request.File, fileBytes);
 
             var dto = new SendMessage
             {
                 ContentType = request.ContentType,
                 Content = string.Empty,
-                File = memoryStream.ToArray(),
+                File = fileBytes,
                 FileName = request.File.FileName,
                 ClientMessageId = request.ClientMessageId,
                 ReplyToMessageId = request.ReplyToMessageId
             };
 
-            var (message, chatParticipants) = await _messageService.SendMessageAsync(UserId, chatId, request.ChatType, dto);
+            Dictionary<string, Dictionary<string, Dictionary<string, MessageDto>>> message;
+            List<string> chatParticipants;
+
+            try
+            {
+                (message, chatParticipants) = await _messageService.SendMessageAsync(UserId, chatId, request.ChatType, dto);
+            }
+            catch (UnknownImageFormatException)
+            {
+                throw new BadRequestException("Unsupported image format. Please upload JPEG, PNG, GIF, WebP, BMP, or TIFF.");
+            }
+
             await BroadcastMessageAsync(message, chatParticipants);
             await _notificationService.SendNewMessageNotificationAsync(
                 UserId,
@@ -258,6 +273,58 @@ namespace ChatNest.API.Controllers
                 CreateNotificationPreview(request.ContentType, chatId, request.File.FileName));
 
             return Ok(message);
+        }
+
+        private static void ValidateUploadedFileContent(MessageContent contentType, IFormFile file, byte[] bytes)
+        {
+            if (contentType != MessageContent.Image)
+            {
+                return;
+            }
+
+            if (!IsSupportedRasterImage(bytes))
+            {
+                throw new BadRequestException("Unsupported image format. Please upload JPEG, PNG, GIF, WebP, BMP, or TIFF.");
+            }
+
+            if (string.Equals(file.ContentType, "image/svg+xml", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Path.GetExtension(file.FileName), ".svg", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BadRequestException("SVG files must be sent as regular files, not image messages.");
+            }
+        }
+
+        private static bool IsSupportedRasterImage(byte[] bytes)
+        {
+            if (bytes.Length >= 3 &&
+                bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+                return true;
+
+            if (bytes.Length >= 8 &&
+                bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
+                bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
+                return true;
+
+            if (bytes.Length >= 6 &&
+                bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 &&
+                bytes[3] == 0x38 && (bytes[4] == 0x37 || bytes[4] == 0x39) && bytes[5] == 0x61)
+                return true;
+
+            if (bytes.Length >= 12 &&
+                bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+                bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+                return true;
+
+            if (bytes.Length >= 2 &&
+                bytes[0] == 0x42 && bytes[1] == 0x4D)
+                return true;
+
+            if (bytes.Length >= 4 &&
+                ((bytes[0] == 0x49 && bytes[1] == 0x49 && bytes[2] == 0x2A && bytes[3] == 0x00) ||
+                 (bytes[0] == 0x4D && bytes[1] == 0x4D && bytes[2] == 0x00 && bytes[3] == 0x2A)))
+                return true;
+
+            return false;
         }
 
         private async Task EnsureChatAccess(string chatId)
@@ -377,13 +444,67 @@ namespace ChatNest.API.Controllers
             };
         }
 
-        private static Dictionary<string, Dictionary<string, ChatDto>> EnsureChatShape(
+        private static MessageItemDto ToMessageItemDto(MessageDto message)
+        {
+            return new MessageItemDto
+            {
+                Id = message.Id,
+                Content = message.Content,
+                ThumbnailUrl = message.ThumbnailUrl,
+                FileName = message.FileName,
+                FileSize = message.FileSize,
+                Type = message.Type,
+                SenderId = message.SenderId,
+                SenderDisplayName = message.Sender?.DisplayName ?? string.Empty,
+                SenderProfilePhoto = message.Sender?.ProfilePhoto?.ToString(),
+                SenderUserIdentifier = message.Sender?.UserIdentifier,
+                ChatId = message.ChatId,
+                ReplyToMessageId = message.ReplyToMessageId,
+                ReplyToSenderId = message.ReplyToSenderId,
+                ReplyToType = message.ReplyToType,
+                ReplyToContent = message.ReplyToContent,
+                ReplyToFileName = message.ReplyToFileName,
+                Status = message.Status,
+                CreatedDate = message.CreatedDate,
+                ClientMessageId = message.ClientMessageId
+            };
+        }
+
+        private static ChatSummaryDto ToChatSummaryDto(ChatDto chat)
+        {
+            var lastMessage = chat.Messages
+                .OrderByDescending(message => message.CreatedDate)
+                .FirstOrDefault();
+
+            return new ChatSummaryDto
+            {
+                Id = chat.Id,
+                ChatType = chat.ChatType,
+                CreatedDate = chat.CreatedDate,
+                ArchivedFor = chat.ArchivedFor,
+                LastMessage = lastMessage == null ? null : ToMessageItemDto(lastMessage),
+                ParticipantIds = chat.ChatParticipants
+                    .Select(participant => participant.UserId)
+                    .Where(userId => !string.IsNullOrWhiteSpace(userId))
+                    .Distinct()
+                    .ToList()
+            };
+        }
+
+        private static Dictionary<string, Dictionary<string, ChatSummaryDto>> EnsureChatSummaryShape(
             Dictionary<string, Dictionary<string, ChatDto>>? chats)
         {
             chats ??= new Dictionary<string, Dictionary<string, ChatDto>>();
-            chats.TryAdd("Individual", new Dictionary<string, ChatDto>());
-            chats.TryAdd("Group", new Dictionary<string, ChatDto>());
-            return chats;
+
+            var summaries = chats.ToDictionary(
+                group => group.Key,
+                group => group.Value.ToDictionary(
+                    chat => chat.Key,
+                    chat => ToChatSummaryDto(chat.Value)));
+
+            summaries.TryAdd("Individual", new Dictionary<string, ChatSummaryDto>());
+            summaries.TryAdd("Group", new Dictionary<string, ChatSummaryDto>());
+            return summaries;
         }
     }
 }

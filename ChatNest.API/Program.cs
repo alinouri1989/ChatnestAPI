@@ -10,6 +10,7 @@ using ChatNest.Entities.Identity;
 using ChatNest.Entities.Models;
 using ChatNest.Services.Abstract;
 using ChatNest.Services.Concrete;
+using ChatNest.Services.Exceptions;
 using ChatNest.Services.Mapping;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -312,17 +313,31 @@ try
             {
                 var exceptionFeature = context.Features.Get<IExceptionHandlerFeature>();
 
-                if (exceptionFeature?.Error is not null)
+                var exception = exceptionFeature?.Error;
+
+                if (exception is not null)
                 {
-                    Log.Error(exceptionFeature.Error, "Unhandled exception for {Path}", context.Request.Path);
+                    Log.Error(exception, "Unhandled exception for {Path}", context.Request.Path);
                 }
 
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                context.Response.StatusCode = exception switch
+                {
+                    BadRequestException => StatusCodes.Status400BadRequest,
+                    UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+                    ForbiddenException => StatusCodes.Status403Forbidden,
+                    NotFoundException => StatusCodes.Status404NotFound,
+                    _ => StatusCodes.Status500InternalServerError
+                };
                 context.Response.ContentType = "application/json";
 
                 await context.Response.WriteAsJsonAsync(new
                 {
-                    message = "خطای داخلی سرور"
+                    message = exception switch
+                    {
+                        BadRequestException or UnauthorizedAccessException or ForbiddenException or NotFoundException
+                            => exception.Message,
+                        _ => "خطای داخلی سرور"
+                    }
                 });
             });
         });

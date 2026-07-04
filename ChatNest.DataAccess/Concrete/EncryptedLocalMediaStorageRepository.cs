@@ -68,19 +68,13 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
     int thumbWidth = 250,          // عرض پیش‌فرض thumbnail
     int thumbHeight = 250)         // ارتفاع پیش‌فرض (اگر 0 باشد نسبت‌مند می‌شود)
     {
-        // ---------- 1️⃣ ذخیرهٔ تصویر اصلی (بدون thumbnail) ----------
-        var originalUri = await PersistEncryptedAsync(
-            publicId,
-            folder,
-            photo.ToArray(),
-            originalFileName,
-            "image/jpeg");          // فرض می‌کنیم jpeg ذخیره می‌شود؛ می‌توانید نوع راDynamic کنید
+        var originalBytes = photo.ToArray();
 
-        // ---------- 2️⃣ ساخت thumbnail ----------
+        // ---------- 1️⃣ ساخت thumbnail ----------
         photo.Position = 0;                     // بازنشانی استریم
         var thumbBytes = await CreateImageThumbnailAsync(photo, thumbWidth, thumbHeight);
 
-        // ---------- 3️⃣ ذخیرهٔ thumbnail ----------
+        // ---------- 2️⃣ ذخیرهٔ thumbnail ----------
         var thumbFolder = Path.Combine(folder, "thumbnails");
         var thumbId = $"{publicId}_thumb";
 
@@ -91,11 +85,11 @@ public sealed class EncryptedLocalMediaStorageRepository : IMediaStorageReposito
             $"{publicId}_thumb.jpg",
             "image/jpeg");
 
-        // ---------- 4️⃣ بروزرسانی متادیتای تصویر اصلی با URI thumbnail ----------
+        // ---------- 3️⃣ ذخیرهٔ تصویر اصلی با URI thumbnail ----------
         var uris = await PersistEncryptedAsync(
             publicId,
             folder,
-            photo.ToArray(),
+            originalBytes,
             originalFileName,
             "image/jpeg",
             thumbFolder,
