@@ -28,6 +28,8 @@ The current service/UI contract is REST-first for data loading and message mutat
 - Use REST for initial chat pages, message history, call logs, text messages, file messages, attachment forwarding, and message deletion.
 - Keep SignalR connected for realtime events: new message broadcasts, ack/read delivery state, typing, presence, notifications, group/profile updates, and call signaling.
 - Do not use SignalR as the primary source for chat/message history in new Android code. Some legacy hub read methods still exist for compatibility, but the web UI has moved active loading to REST.
+- The current web UI uses the shared `createData` HTTP helper for REST calls. It sends JSON bodies by default, sends `FormData` unchanged for uploads, attaches the JWT bearer token, and refreshes expired access tokens with `POST /api/Auth/RefreshToken`.
+- The web UI treats REST text-send success as an acknowledgement and reconciles the actual message from `ReceiveGetMessages`. File sends, deletes, and forwards return the realtime message payload directly.
 
 ## Authentication
 
@@ -250,7 +252,11 @@ Anonymous.
 Success:
 
 ```json
-{ "token": "<jwt>" }
+{
+  "token": "<jwt>",
+  "refreshToken": "<opaque-refresh-token>",
+  "refreshTokenExpiration": "2026-08-03T00:00:00Z"
+}
 ```
 
 `POST /api/Auth/SignInGoogle`
@@ -290,7 +296,11 @@ Anonymous. Body is a Firebase provider user object:
 Success:
 
 ```json
-{ "token": "<jwt>" }
+{
+  "token": "<jwt>",
+  "refreshToken": "<opaque-refresh-token>",
+  "refreshTokenExpiration": "2026-08-03T00:00:00Z"
+}
 ```
 
 `POST /api/Auth/SignInFacebook`
@@ -299,7 +309,33 @@ Anonymous. Same body shape as `SignInGoogle`.
 
 `POST /api/Auth/SignOut`
 
-Authorized. Current implementation returns success and does not revoke the JWT.
+Anonymous. Revokes the supplied refresh token. Existing access tokens remain valid until their normal JWT expiry.
+
+```json
+{
+  "refreshToken": "<opaque-refresh-token>"
+}
+```
+
+`POST /api/Auth/RefreshToken`
+
+Anonymous. Rotates the refresh token and returns a fresh token pair.
+
+```json
+{
+  "refreshToken": "<opaque-refresh-token>"
+}
+```
+
+Success:
+
+```json
+{
+  "token": "<new-jwt>",
+  "refreshToken": "<new-opaque-refresh-token>",
+  "refreshTokenExpiration": "2026-08-03T00:00:00Z"
+}
+```
 
 `POST /api/Auth/Password`
 
@@ -526,7 +562,31 @@ Returns a paged chat list plus profile dictionaries.
 ```json
 {
   "chats": {
-    "Individual": {},
+    "Individual": {
+      "chat-guid": {
+        "id": "chat-guid",
+        "chatType": "Individual",
+        "createdDate": "2026-06-13T00:00:00Z",
+        "archivedFor": {},
+        "lastMessage": {
+          "id": "message-guid",
+          "content": "<encrypted or media URL>",
+          "thumbnailUrl": "",
+          "fileName": null,
+          "fileSize": null,
+          "type": 0,
+          "senderId": "user-id",
+          "senderDisplayName": "Ali Nouri",
+          "senderProfilePhoto": "https://...",
+          "senderUserIdentifier": "ali_1989",
+          "chatId": "chat-guid",
+          "status": { "sent": {}, "delivered": {}, "read": {} },
+          "createdDate": "2026-06-13T00:00:00Z",
+          "clientMessageId": "android-local-id"
+        },
+        "participantIds": ["current-user-id", "recipient-user-id"]
+      }
+    },
     "Group": {}
   },
   "recipientProfiles": {},
@@ -538,7 +598,7 @@ Returns a paged chat list plus profile dictionaries.
 }
 ```
 
-`take` is clamped server-side to `1..100`.
+`take` is clamped server-side to `1..100`. REST initial chat pages return `ChatSummaryDto` entries, not full `ChatDto` graphs. Use `lastMessage` for the chat list preview and load full message history through `/api/Chat/{chatId}/Messages`.
 
 `GET /api/Chat/Total`
 
@@ -553,14 +613,43 @@ Returns a paged message response:
   "chatId": "guid",
   "chatType": "Individual",
   "totalCount": 100,
-  "messages": [],
+  "messages": [
+    {
+      "id": "message-guid",
+      "content": "<encrypted text or media URL>",
+      "thumbnailUrl": "",
+      "fileName": null,
+      "fileSize": null,
+      "type": 0,
+      "senderId": "user-id",
+      "senderDisplayName": "Ali Nouri",
+      "senderProfilePhoto": "https://...",
+      "senderUserIdentifier": "ali_1989",
+      "chatId": "guid",
+      "replyToMessageId": null,
+      "replyToSenderId": null,
+      "replyToType": null,
+      "replyToContent": null,
+      "replyToFileName": null,
+      "status": { "sent": {}, "delivered": {}, "read": {} },
+      "createdDate": "2026-06-13T00:00:00Z",
+      "clientMessageId": "android-local-id"
+    }
+  ],
   "skip": 0,
   "take": 50,
-  "nextSkip": 50,
+  "pageNumber": 1,
+  "pageSize": 50,
   "hasNextPage": true,
+  "nextSkip": 50,
+  "dayStartUtc": null,
+  "nextCursorUtc": null,
+  "hasMore": true,
   "isInitial": true
 }
 ```
+
+`skip` and `take` are normalized server-side, and `take` is clamped to `1..100`. Messages are `MessageItemDto` objects intended for API clients; they include sender display/profile fields so clients do not need to inspect nested sender objects for message rows.
 
 `GET /api/Chat/{chatId}/MessagesByDay?beforeUtc=2026-06-13T00:00:00Z`
 
@@ -572,12 +661,20 @@ Returns one day of messages before the optional UTC cursor. Use `nextCursorUtc` 
   "chatType": "Individual",
   "totalCount": 100,
   "messages": [],
+  "skip": 0,
+  "take": 0,
+  "pageNumber": 1,
+  "pageSize": 0,
+  "hasNextPage": false,
+  "nextSkip": null,
   "dayStartUtc": "2026-06-13T00:00:00Z",
   "nextCursorUtc": "2026-06-12T00:00:00Z",
   "hasMore": true,
   "isInitial": true
 }
 ```
+
+Day pagination uses `nextCursorUtc` instead of `nextSkip`. Pass the returned cursor as the next `beforeUtc` value to load older days.
 
 `POST /api/Chat/{chatId}/Messages?chatType=Individual`
 
@@ -593,7 +690,13 @@ Sends a text message through REST and broadcasts `ReceiveGetMessages` to partici
 }
 ```
 
-Success returns the created message envelope.
+Success:
+
+```json
+{ "accepted": true }
+```
+
+The created message is still broadcast to chat participants through `ReceiveGetMessages`. Current clients should use `clientMessageId` in the outgoing body to reconcile optimistic local messages with that SignalR event.
 
 `POST /api/Chat/{chatId}/Messages/File`
 
@@ -607,15 +710,38 @@ clientMessageId=android-local-id
 replyToMessageId=<optional message id>
 ```
 
-`contentType` must be one of the non-text `MessageContent` enum values.
+`contentType` must be one of the non-text `MessageContent` enum values. For `Image`, the server validates the binary signature as JPEG, PNG, GIF, WebP, BMP, or TIFF. SVG files must be sent as regular `File` messages, not `Image` messages.
+
+Success returns the `ReceiveGetMessages` payload shape:
+
+```json
+{
+  "Individual": {
+    "chat-guid": {
+      "message-guid": {
+        "id": "message-guid",
+        "content": "https://...",
+        "thumbnailUrl": "https://...",
+        "fileName": "photo.jpg",
+        "fileSize": 12345,
+        "type": 1,
+        "senderId": "user-id",
+        "chatId": "chat-guid",
+        "createdDate": "2026-06-13T00:00:00Z",
+        "clientMessageId": "android-local-id"
+      }
+    }
+  }
+}
+```
 
 `DELETE /api/Chat/{chatId}/Messages/{messageId}/ForMe?chatType=Individual`
 
-Deletes a message for the current user and broadcasts the updated message envelope.
+Deletes a message for the current user, broadcasts the updated message envelope to that user, and returns the same message payload shape.
 
 `DELETE /api/Chat/{chatId}/Messages/{messageId}/ForEveryone?chatType=Individual`
 
-Deletes a message for everyone. Only the sender can delete for everyone.
+Deletes a message for everyone. Only the sender can delete for everyone. The response and broadcast payload contain a tombstone-style message update for the deleted message id.
 
 `POST /api/Chat/{chatId}/Messages/ForwardAttachment`
 
@@ -628,6 +754,8 @@ Forwards an existing attachment message to an existing chat.
 }
 ```
 
+Success returns the forwarded message payload in the same nested `ReceiveGetMessages` shape.
+
 `POST /api/Chat/Messages/{sourceMessageId}/ForwardToUser/{recipientId}`
 
 Creates or reuses an individual chat with the recipient, forwards the attachment, broadcasts chat/message events, and returns:
@@ -639,9 +767,13 @@ Creates or reuses an individual chat with the recipient, forwards the attachment
 }
 ```
 
+`message` uses the same nested `ReceiveGetMessages` payload shape.
+
 Retrofit outline:
 
 ```kotlin
+data class AcceptedResponse(val accepted: Boolean)
+
 interface ChatApi {
     @GET("api/Chat/Initial")
     suspend fun initialChats(
@@ -661,7 +793,7 @@ interface ChatApi {
         @Path("chatId") chatId: String,
         @Query("chatType") chatType: String,
         @Body body: SendMessageRequest
-    ): Map<String, Any>
+    ): AcceptedResponse
 
     @Multipart
     @POST("api/Chat/{chatId}/Messages/File")
@@ -772,7 +904,39 @@ Do not cache authenticated API JSON responses containing private chat/user data 
 
 ## Core Response Models
 
+`ChatSummaryDto`
+
+Used by `GET /api/Chat/Initial`.
+
+```json
+{
+  "id": "guid",
+  "chatType": "Individual",
+  "createdDate": "2026-06-13T00:00:00Z",
+  "archivedFor": {},
+  "lastMessage": {
+    "id": "message-guid",
+    "content": "<encrypted text or media URL>",
+    "thumbnailUrl": "",
+    "fileName": null,
+    "fileSize": null,
+    "type": 0,
+    "senderId": "user-id",
+    "senderDisplayName": "Ali Nouri",
+    "senderProfilePhoto": "https://...",
+    "senderUserIdentifier": "ali_1989",
+    "chatId": "guid",
+    "status": { "sent": {}, "delivered": {}, "read": {} },
+    "createdDate": "2026-06-13T00:00:00Z",
+    "clientMessageId": "android-local-id"
+  },
+  "participantIds": ["user-id", "recipient-user-id"]
+}
+```
+
 `ChatDto`
+
+Used by legacy hub chat events such as `ReceiveInitialChats` and `ReceiveCreateChat`.
 
 ```json
 {
@@ -785,7 +949,37 @@ Do not cache authenticated API JSON responses containing private chat/user data 
 }
 ```
 
-`Message`
+`MessageItemDto`
+
+Used by REST message page responses and `ChatSummaryDto.lastMessage`.
+
+```json
+{
+  "id": "guid",
+  "content": "text or media URL",
+  "thumbnailUrl": "optional thumbnail URL",
+  "fileName": "file.pdf",
+  "fileSize": 12345,
+  "type": 0,
+  "senderId": "user-id",
+  "senderDisplayName": "Ali Nouri",
+  "senderProfilePhoto": "https://...",
+  "senderUserIdentifier": "ali_1989",
+  "chatId": "chat-guid",
+  "replyToMessageId": null,
+  "replyToSenderId": null,
+  "replyToType": null,
+  "replyToContent": null,
+  "replyToFileName": null,
+  "status": { "sent": {}, "delivered": {}, "read": {} },
+  "createdDate": "2026-06-13T00:00:00Z",
+  "clientMessageId": "android-local-id"
+}
+```
+
+`MessageDto`
+
+Used by SignalR message payloads such as `ReceiveGetMessages`.
 
 ```json
 {
@@ -1415,10 +1609,16 @@ room.localParticipant.setCameraEnabled(callType == 1)
 ```kotlin
 interface AuthApi {
     @POST("api/Auth/SignInEmail")
-    suspend fun signInEmail(@Body body: SignInEmailRequest): TokenResponse
+    suspend fun signInEmail(@Body body: SignInEmailRequest): AuthTokenResponse
 
     @POST("api/Auth/SignUp")
     suspend fun signUp(@Body body: SignUpRequest): MessageResponse
+
+    @POST("api/Auth/RefreshToken")
+    suspend fun refreshToken(@Body body: RefreshTokenRequest): AuthTokenResponse
+
+    @POST("api/Auth/SignOut")
+    suspend fun signOut(@Body body: RefreshTokenRequest): MessageResponse
 }
 
 interface UserApi {
@@ -1469,7 +1669,7 @@ class BearerInterceptor(private val tokenProvider: () -> String?) : Interceptor 
 2. Register all SignalR handlers before calling `start()`.
 3. Keep the JWT in encrypted storage and refresh/re-login before reconnecting after token expiry.
 4. Load chats, message history, and call logs through REST, not SignalR.
-5. Send text messages, file messages, attachment forwards, and deletes through REST; keep listening for `ReceiveGetMessages` to reconcile realtime state.
+5. Send text messages, file messages, attachment forwards, and deletes through REST; keep listening for `ReceiveGetMessages` to reconcile realtime state. Text send returns `{ accepted: true }`, while file/delete/forward endpoints return the nested message payload.
 6. Treat all nested SignalR dictionaries as maps keyed by ids: chat type, chat id, message id, user id.
 7. Prefer `clientMessageId` for optimistic UI reconciliation after `ReceiveGetMessages`.
 8. Use multipart REST file upload for new Android code. Use hub chunked upload only for legacy clients that cannot send multipart files.
