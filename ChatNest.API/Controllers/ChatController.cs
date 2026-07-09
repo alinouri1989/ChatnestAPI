@@ -84,6 +84,18 @@ namespace ChatNest.API.Controllers
             return Ok(await _messageService.GetChatMessagesPageAsync(UserId, parsedChatId, skip, take));
         }
 
+        [HttpPost("{chatId}/Pin")]
+        public async Task<IActionResult> PinChat(string chatId, [FromQuery] string chatType = "Individual")
+        {
+            return Ok(await _chatService.PinChatAsync(UserId, chatType, chatId));
+        }
+
+        [HttpDelete("{chatId}/Pin")]
+        public async Task<IActionResult> UnpinChat(string chatId, [FromQuery] string chatType = "Individual")
+        {
+            return Ok(await _chatService.UnpinChatAsync(UserId, chatType, chatId));
+        }
+
         [HttpGet("{chatId}/MessagesByDay")]
         public async Task<ActionResult<ChatMessagesPageResponse>> MessagesByDay(
             string chatId,
@@ -482,6 +494,7 @@ namespace ChatNest.API.Controllers
                 ChatType = chat.ChatType,
                 CreatedDate = chat.CreatedDate,
                 ArchivedFor = chat.ArchivedFor,
+                PinnedFor = chat.PinnedFor,
                 LastMessage = lastMessage == null ? null : ToMessageItemDto(lastMessage),
                 ParticipantIds = chat.ChatParticipants
                     .Select(participant => participant.UserId)

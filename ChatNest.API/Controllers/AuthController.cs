@@ -113,6 +113,51 @@ namespace ChatNest.API.Controllers
             }
         }
 
+        [HttpPost]
+        public async Task<IActionResult> RequestLoginOtp([FromBody] RequestLoginOtp dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _authService.RequestLoginOtpAsync(dto);
+                return Ok(new { message = "کد ورود ارسال شد." });
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> VerifyLoginOtp([FromBody] VerifyLoginOtp dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                return Ok(await _authService.VerifyLoginOtpAsync(dto));
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
         /// <summary>
         /// ورود به سیستم با Google را انجام می‌دهد.
         /// در صورت نامعتبر بودن ورود Google و سایر شرایط خطا، پاسخ‌های مناسب برمی‌گرداند.

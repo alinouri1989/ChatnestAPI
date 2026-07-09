@@ -8,6 +8,8 @@ public interface IChatService
     Task<Dictionary<string, Dictionary<string, ChatDto>>> ClearChatAsync(string userId, string chatType, string chatId);
     Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> ArchiveIndividualChatAsync(string userId, string chatId);
     Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> UnarchiveIndividualChatAsync(string userId, string chatId);
+    Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> PinChatAsync(string userId, string chatType, string chatId);
+    Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> UnpinChatAsync(string userId, string chatType, string chatId);
 
     // New methods
     Task AddParticipantToChatAsync(string chatId, string userId);

@@ -296,6 +296,62 @@ namespace ChatNest.Services.Concrete
             return result;
         }
 
+        public async Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> PinChatAsync(string userId, string chatType, string chatId)
+        {
+            var parsedChatId = ParseRequiredGuid(chatId, "chat id");
+            var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
+            if (chat == null)
+                throw new NotFoundException("Chat not found");
+
+            var participants = await _chatRepository.GetChatParticipantsAsync(parsedChatId);
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
+
+            var pinnedFor = chat.PinnedFor;
+            pinnedFor[userId] = DateTime.UtcNow;
+            chat.PinnedFor = pinnedFor;
+            await _chatRepository.UpdateChatAsync(chat);
+
+            var normalizedType = chat.ChatType.Equals("Group", StringComparison.OrdinalIgnoreCase) ? "Group" : "Individual";
+            if (!string.IsNullOrWhiteSpace(chatType))
+            {
+                normalizedType = chatType.Equals("Group", StringComparison.OrdinalIgnoreCase) ? "Group" : "Individual";
+            }
+
+            return new Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>
+            {
+                { normalizedType, new Dictionary<string, Dictionary<string, DateTime>> { { chatId, pinnedFor } } }
+            };
+        }
+
+        public async Task<Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>> UnpinChatAsync(string userId, string chatType, string chatId)
+        {
+            var parsedChatId = ParseRequiredGuid(chatId, "chat id");
+            var chat = await _chatRepository.GetChatByIdAsync(parsedChatId);
+            if (chat == null)
+                throw new NotFoundException("Chat not found");
+
+            var participants = await _chatRepository.GetChatParticipantsAsync(parsedChatId);
+            if (!participants.Contains(userId))
+                throw new NotFoundException("Access denied");
+
+            var pinnedFor = chat.PinnedFor;
+            pinnedFor.Remove(userId);
+            chat.PinnedFor = pinnedFor;
+            await _chatRepository.UpdateChatAsync(chat);
+
+            var normalizedType = chat.ChatType.Equals("Group", StringComparison.OrdinalIgnoreCase) ? "Group" : "Individual";
+            if (!string.IsNullOrWhiteSpace(chatType))
+            {
+                normalizedType = chatType.Equals("Group", StringComparison.OrdinalIgnoreCase) ? "Group" : "Individual";
+            }
+
+            return new Dictionary<string, Dictionary<string, Dictionary<string, DateTime>>>
+            {
+                { normalizedType, new Dictionary<string, Dictionary<string, DateTime>> { { chatId, pinnedFor } } }
+            };
+        }
+
         // Add new helper methods
         public async Task AddParticipantToChatAsync(string chatId, string userId)
         {

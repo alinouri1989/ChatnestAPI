@@ -9,6 +9,7 @@ using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -24,7 +25,9 @@ namespace ChatNest.Services.Concrete
         private readonly UserManager<User> _userManager;
         private readonly IJwtManager _jwtManager;
         private readonly IEmailService _emailService;
+        private readonly ISmsOtpSender _smsOtpSender;
         private readonly IConfiguration _configuration;
+        private readonly IMemoryCache _memoryCache;
         private readonly ILogger<AuthService> _logger;
         private readonly IMapper _mapper;
 
@@ -34,7 +37,9 @@ namespace ChatNest.Services.Concrete
             UserManager<User> userManager,
             IJwtManager jwtManager,
             IEmailService emailService,
+            ISmsOtpSender smsOtpSender,
             IConfiguration configuration,
+            IMemoryCache memoryCache,
             ILogger<AuthService> logger,
             IMapper mapper)
         {
@@ -43,7 +48,9 @@ namespace ChatNest.Services.Concrete
             _userManager = userManager;
             _jwtManager = jwtManager;
             _emailService = emailService;
+            _smsOtpSender = smsOtpSender;
             _configuration = configuration;
+            _memoryCache = memoryCache;
             _logger = logger;
             _mapper = mapper;
         }
@@ -59,6 +66,8 @@ namespace ChatNest.Services.Concrete
             {
                 UserName = dto.Email,
                 Email = dto.Email,
+                PhoneNumber = NormalizeMobile(dto.PhoneNumber),
+                MobileNo = NormalizeMobile(dto.PhoneNumber),
                 DisplayName = dto.DisplayName.Trim(),
                 BirthDate = dto.BirthDate.ToShortDateString(),
                 CreatedDate = DateTime.UtcNow,
@@ -92,6 +101,103 @@ namespace ChatNest.Services.Concrete
             }
 
             throw new BadRequestException("نام کاربری یا کلمه عبور صحیح نمی باشد");
+        }
+
+        public async Task RequestLoginOtpAsync(RequestLoginOtp dto)
+        {
+            var email = NormalizeEmail(dto.Email);
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var userByEmail = await _userManager.FindByEmailAsync(email);
+                if (userByEmail == null)
+                {
+                    throw new NotFoundException("کاربری با این ایمیل یافت نشد.");
+                }
+
+                var emailCode = GenerateOtpCode();
+                _memoryCache.Set(
+                    BuildEmailOtpCacheKey(email),
+                    HashOtp(email, emailCode),
+                    TimeSpan.FromMinutes(GetOtpExpiryMinutes()));
+
+                await SendEmailOtpAsync(email, emailCode);
+                return;
+            }
+
+            var mobile = NormalizeMobile(dto.Mobile);
+            if (string.IsNullOrWhiteSpace(mobile))
+            {
+                throw new BadRequestException("ایمیل یا شماره موبایل معتبر وارد کنید.");
+            }
+
+            var user = await FindUserByMobileAsync(mobile);
+            if (user == null)
+            {
+                throw new NotFoundException("کاربری با این شماره موبایل یافت نشد.");
+            }
+
+            var code = GenerateOtpCode();
+            _memoryCache.Set(
+                BuildOtpCacheKey(mobile),
+                HashOtp(mobile, code),
+                TimeSpan.FromMinutes(GetOtpExpiryMinutes()));
+
+            await _smsOtpSender.SendOtpAsync(mobile, code);
+        }
+
+        public async Task<AuthTokenResponse> VerifyLoginOtpAsync(VerifyLoginOtp dto)
+        {
+            var email = NormalizeEmail(dto.Email);
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                if (string.IsNullOrWhiteSpace(dto.Code))
+                {
+                    throw new BadRequestException("کد تأیید معتبر نیست.");
+                }
+
+                if (!_memoryCache.TryGetValue<string>(BuildEmailOtpCacheKey(email), out var expectedEmailHash) ||
+                    !string.Equals(expectedEmailHash, HashOtp(email, dto.Code), StringComparison.Ordinal))
+                {
+                    throw new BadRequestException("کد تأیید صحیح نیست یا منقضی شده است.");
+                }
+
+                var userByEmail = await _userManager.FindByEmailAsync(email);
+                if (userByEmail == null)
+                {
+                    throw new NotFoundException("کاربری با این ایمیل یافت نشد.");
+                }
+
+                _memoryCache.Remove(BuildEmailOtpCacheKey(email));
+                return await IssueTokensAsync(userByEmail.Id);
+            }
+
+            var mobile = NormalizeMobile(dto.Mobile);
+            if (string.IsNullOrWhiteSpace(mobile) || string.IsNullOrWhiteSpace(dto.Code))
+            {
+                throw new BadRequestException("شماره موبایل یا کد تأیید معتبر نیست.");
+            }
+
+            if (!_memoryCache.TryGetValue<string>(BuildOtpCacheKey(mobile), out var expectedHash) ||
+                !string.Equals(expectedHash, HashOtp(mobile, dto.Code), StringComparison.Ordinal))
+            {
+                throw new BadRequestException("کد تأیید صحیح نیست یا منقضی شده است.");
+            }
+
+            var user = await FindUserByMobileAsync(mobile);
+            if (user == null)
+            {
+                throw new NotFoundException("کاربری با این شماره موبایل یافت نشد.");
+            }
+
+            _memoryCache.Remove(BuildOtpCacheKey(mobile));
+            if (!user.MobileConfirmed || !user.PhoneNumberConfirmed)
+            {
+                user.MobileConfirmed = true;
+                user.PhoneNumberConfirmed = true;
+                await _userRepository.UpdateUserAsync(user);
+            }
+
+            return await IssueTokensAsync(user.Id);
         }
 
         public async Task<AuthTokenResponse> SignInGoogleAsync(SignInProvider dto)
@@ -227,6 +333,67 @@ namespace ChatNest.Services.Concrete
         private static string HashRefreshToken(string refreshToken)
         {
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
+        }
+
+        private static string NormalizeMobile(string? mobile)
+        {
+            var value = new string((mobile ?? string.Empty).Where(ch => char.IsDigit(ch) || ch == '+').ToArray()).Trim();
+            if (value.StartsWith("0098", StringComparison.Ordinal))
+            {
+                return "+98" + value[4..];
+            }
+
+            if (value.StartsWith("98", StringComparison.Ordinal) && value.Length == 12)
+            {
+                return "+98" + value[2..];
+            }
+
+            if (value.StartsWith("09", StringComparison.Ordinal) && value.Length == 11)
+            {
+                return "+98" + value[1..];
+            }
+
+            return value;
+        }
+
+        private static string NormalizeEmail(string? email) => (email ?? string.Empty).Trim();
+
+        private int GetOtpExpiryMinutes() => _configuration.GetValue<int?>("Kavenegar:OtpExpiryMinutes") ?? 2;
+
+        private static string GenerateOtpCode() =>
+            RandomNumberGenerator.GetInt32(100000, 999999).ToString(CultureInfo.InvariantCulture);
+
+        private Task SendEmailOtpAsync(string email, string code)
+        {
+            var htmlBody = $"""
+                <div style="font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right;line-height:1.8">
+                    <h2>کد ورود ChatNest</h2>
+                    <p>برای ورود به حساب خود از کد زیر استفاده کنید:</p>
+                    <p style="font-size:24px;font-weight:700;letter-spacing:4px;direction:ltr;text-align:center">{code}</p>
+                    <p>اگر شما این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.</p>
+                </div>
+                """;
+
+            return _emailService.SendEmailAsync(email, "کد ورود ChatNest", htmlBody);
+        }
+
+        private static string BuildOtpCacheKey(string mobile) => $"login-otp:{mobile}";
+
+        private static string BuildEmailOtpCacheKey(string email) => $"login-otp-email:{email}";
+
+        private static string HashOtp(string identifier, string code)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{identifier}:{code.Trim()}")));
+        }
+
+        private Task<User?> FindUserByMobileAsync(string mobile)
+        {
+            var localMobile = mobile.Replace("+98", "0", StringComparison.Ordinal);
+            return Task.FromResult(_userManager.Users.FirstOrDefault(user =>
+                user.PhoneNumber == mobile ||
+                user.MobileNo == mobile ||
+                user.PhoneNumber == localMobile ||
+                user.MobileNo == localMobile));
         }
 
         public async Task ResetPasswordAsync(string email)

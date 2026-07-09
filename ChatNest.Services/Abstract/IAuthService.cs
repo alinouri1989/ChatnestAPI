@@ -10,6 +10,8 @@ namespace ChatNest.Services.Abstract
         Task<AuthTokenResponse> SignInEmailAsync(SignInEmail dto);
         Task<AuthTokenResponse> SignInGoogleAsync(SignInProvider dto);
         Task<AuthTokenResponse> SignInFacebookAsync(SignInProvider dto);
+        Task RequestLoginOtpAsync(RequestLoginOtp dto);
+        Task<AuthTokenResponse> VerifyLoginOtpAsync(VerifyLoginOtp dto);
         Task<AuthTokenResponse> RefreshTokenAsync(string refreshToken);
         Task RevokeRefreshTokenAsync(string refreshToken);
         Task ResetPasswordAsync(string email);

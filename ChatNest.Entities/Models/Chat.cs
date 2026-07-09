@@ -13,6 +13,7 @@ public sealed class Chat
 
     // Store as JSON string in database
     public string ArchivedForJson { get; set; } = string.Empty;
+    public string PinnedForJson { get; set; } = string.Empty;
 
     [NotMapped]
     public Dictionary<string, DateTime> ArchivedFor
@@ -21,6 +22,15 @@ public sealed class Chat
                new Dictionary<string, DateTime>() :
                JsonSerializer.Deserialize<Dictionary<string, DateTime>>(ArchivedForJson) ?? new Dictionary<string, DateTime>();
         set => ArchivedForJson = JsonSerializer.Serialize(value);
+    }
+
+    [NotMapped]
+    public Dictionary<string, DateTime> PinnedFor
+    {
+        get => string.IsNullOrEmpty(PinnedForJson) ?
+               new Dictionary<string, DateTime>() :
+               JsonSerializer.Deserialize<Dictionary<string, DateTime>>(PinnedForJson) ?? new Dictionary<string, DateTime>();
+        set => PinnedForJson = JsonSerializer.Serialize(value);
     }
 
     public DateTime CreatedDate { get; set; }

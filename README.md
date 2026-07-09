@@ -33,12 +33,15 @@ This project serves as an example of how **real-time messaging, group chats, mul
 
 ### ðŸ” **Authentication & Authorization**
 - Account creation with email and password.
+- Mobile OTP login through configurable SMS providers. Default provider is Melipayamak; Kavenegar is also available.
+- Configure `Sms:DefaultProvider`, `Melipayamak:Username`, `Melipayamak:Password`, `Melipayamak:BodyId`, or Kavenegar keys when using Kavenegar.
 - Quick registration using **Google** and **Facebook**.
 - Password reset via email.
 - JWT based secure login.
    
 ### ðŸ’¬ **Real-Time Messaging**
 - Real-time **group** and **individual** messaging support.
+- Per-user pinned chats/groups are supported through REST endpoints and stored with chat metadata.
 - Message **status** tracking (sent, delivered, read).
 - AI-integrated response generation.
 - File and media attachment support.

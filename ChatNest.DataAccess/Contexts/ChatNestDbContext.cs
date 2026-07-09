@@ -107,6 +107,7 @@ namespace ChatNest.DataAccess.Contexts
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ChatType).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.ArchivedForJson).HasColumnType("nvarchar(max)");
+                entity.Property(e => e.PinnedForJson).HasColumnType("nvarchar(max)");
 
                 entity.HasMany(c => c.Messages)
                       .WithOne(m => m.Chat)

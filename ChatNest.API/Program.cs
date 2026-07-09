@@ -166,6 +166,7 @@ try
 
     // Add Authorization
     builder.Services.AddAuthorization();
+    builder.Services.AddMemoryCache();
 
     // Register JWT Manager
     builder.Services.AddScoped<IJwtManager, JwtManager>();
@@ -189,6 +190,9 @@ try
     builder.Services.AddScoped<ICallService, CallService>();
     builder.Services.AddScoped<IGenerativeAiService, GenerativeAiService>();
     builder.Services.AddScoped<INotificationService, FirebaseNotificationService>();
+    builder.Services.AddScoped<KavenegarSmsOtpSender>();
+    builder.Services.AddHttpClient<MelipayamakSmsOtpSender>();
+    builder.Services.AddScoped<ISmsOtpSender, ConfigurableSmsOtpSender>();
 
     // Add HttpClient for AI services
     builder.Services.AddHttpClient();
