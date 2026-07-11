@@ -201,16 +201,32 @@ namespace ChatNest.Services.Concrete
             if (user == null)
                 throw new NotFoundException("User not found");
 
-            user.PhoneNumber = dto.PhoneNumber;
+            var phoneNumber = NormalizeMobile(dto.PhoneNumber);
+            user.PhoneNumber = phoneNumber;
+            user.MobileNo = phoneNumber;
             await _userRepository.UpdateUserAsync(user);
 
             // Also update Identity user
             var appUser = await _userManager.FindByIdAsync(userId);
             if (appUser != null)
             {
-                appUser.PhoneNumber = dto.PhoneNumber;
+                appUser.PhoneNumber = phoneNumber;
+                appUser.MobileNo = phoneNumber;
                 await _userManager.UpdateAsync(appUser);
             }
+        }
+
+        private static string NormalizeMobile(string mobile)
+        {
+            var value = new string(mobile.Where(ch => char.IsDigit(ch) || ch == '+').ToArray()).Trim();
+            if (value.StartsWith("0098", StringComparison.Ordinal))
+                return "+98" + value[4..];
+            if (value.StartsWith("98", StringComparison.Ordinal) && value.Length == 12)
+                return "+98" + value[2..];
+            if (value.StartsWith("09", StringComparison.Ordinal) && value.Length == 11)
+                return "+98" + value[1..];
+
+            return value;
         }
 
         public async Task UpdateBiographyAsync(string userId, UpdateBiography dto)

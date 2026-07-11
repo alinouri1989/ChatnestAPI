@@ -9,6 +9,7 @@ using ChatNest.Services.Utilities;
 using ChatNest.Shared.DTOs.Request;
 using ChatNest.Shared.DTOs.Response;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -386,14 +387,26 @@ namespace ChatNest.Services.Concrete
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{identifier}:{code.Trim()}")));
         }
 
-        private Task<User?> FindUserByMobileAsync(string mobile)
+        private async Task<User?> FindUserByMobileAsync(string mobile)
         {
             var localMobile = mobile.Replace("+98", "0", StringComparison.Ordinal);
-            return Task.FromResult(_userManager.Users.FirstOrDefault(user =>
-                user.PhoneNumber == mobile ||
-                user.MobileNo == mobile ||
-                user.PhoneNumber == localMobile ||
-                user.MobileNo == localMobile));
+
+            // PhoneNumber is the canonical value exposed and edited by the user profile.
+            // Check it first so a stale legacy MobileNo on another account cannot win an
+            // unordered FirstOrDefault query and issue a token for the wrong user.
+            var user = await _userManager.Users.FirstOrDefaultAsync(candidate =>
+                candidate.PhoneNumber == mobile || candidate.PhoneNumber == localMobile);
+
+            if (user != null)
+            {
+                return user;
+            }
+
+            // MobileNo is retained only as a fallback for legacy accounts which have not
+            // yet populated Identity's PhoneNumber field.
+            return await _userManager.Users.FirstOrDefaultAsync(candidate =>
+                string.IsNullOrEmpty(candidate.PhoneNumber) &&
+                (candidate.MobileNo == mobile || candidate.MobileNo == localMobile));
         }
 
         public async Task ResetPasswordAsync(string email)
