@@ -9,7 +9,9 @@ See UI changelog for frontend details.
   - `POST api/Chat/{chatId}/Pin?chatType=`
   - `DELETE api/Chat/{chatId}/Pin?chatType=`
 - Added Kavenegar package support for mobile OTP login using `KavenegarApi.VerifyLookup`.
-- Added Melipayamak OTP sending through REST `BaseServiceNumber`.
+- Added Melipayamak OTP sending through the shared JSON endpoint:
+  `POST https://console.melipayamak.com/api/send/shared/{SharedToken}`
+- Kept the previous Melipayamak `BaseServiceNumber` API as an alternate mode with `Melipayamak:SendMode = BaseServiceNumber`.
 - Added configurable SMS provider selection with `Sms:DefaultProvider`; default is `Melipayamak`.
 - Added auth endpoints:
   - `POST api/Auth/RequestLoginOtp`
@@ -17,7 +19,7 @@ See UI changelog for frontend details.
 - Added SMS config keys:
   - `Sms:DefaultProvider`
   - `Kavenegar:ApiKey`, `Kavenegar:OtpTemplate`, `Kavenegar:OtpExpiryMinutes`
-  - `Melipayamak:Username`, `Melipayamak:Password`, `Melipayamak:BodyId`
+  - `Melipayamak:SendMode`, `Melipayamak:SharedToken`, `Melipayamak:Username`, `Melipayamak:Password`, `Melipayamak:BodyId`
 - Registration now stores normalized mobile on `PhoneNumber` and `MobileNo` when provided.
 - Verified the existing LiveKit/SignalR call code builds without changes.
 

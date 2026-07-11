@@ -34,7 +34,7 @@ This project serves as an example of how **real-time messaging, group chats, mul
 ### ðŸ” **Authentication & Authorization**
 - Account creation with email and password.
 - Mobile OTP login through configurable SMS providers. Default provider is Melipayamak; Kavenegar is also available.
-- Configure `Sms:DefaultProvider`, `Melipayamak:Username`, `Melipayamak:Password`, `Melipayamak:BodyId`, or Kavenegar keys when using Kavenegar.
+- Configure `Sms:DefaultProvider`, `Melipayamak:SendMode`, `Melipayamak:SharedToken`, `Melipayamak:BodyId`, or Kavenegar keys when using Kavenegar. The previous Melipayamak username/password BaseServiceNumber API is still available with `Melipayamak:SendMode = BaseServiceNumber`.
 - Quick registration using **Google** and **Facebook**.
 - Password reset via email.
 - JWT based secure login.
