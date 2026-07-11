@@ -2,6 +2,21 @@
 
 dotnet run --project .\ChatNest.API\ChatNest.API.csproj --launch-profile https
 
+## Application version policy
+
+`GET /api/app-version` is a public, database-backed endpoint for Android, iOS, and PWA. Clients send `platform`, integer `build`, display `version`, and `channel`; the API returns `none`, `optional`, `required`, or `maintenance`.
+
+Policies live in `AppVersionPolicies` and ordered notes in `AppVersionReleaseNotes`. Migration `AddAppVersionPolicies` creates and seeds production rows. Update release policy in SQL Server, not `appsettings.json`.
+
+```sql
+UPDATE AppVersionPolicies
+SET LatestVersion = '2.6.0', LatestBuild = 140,
+    MinimumSupportedVersion = '2.4.0', MinimumSupportedBuild = 120
+WHERE Platform = 'android' AND Channel = 'production';
+```
+
+Set `Maintenance = 1` to block one platform/channel temporarily. Full operations and client behavior are in [APP_VERSIONING.md](APP_VERSIONING.md).
+
 ### ðŸŽ¯ Project Purpose  
 
 This project was initiated as part of the **BSM307 Computer Networks** course in the **Computer Technologies and Information Systems (CTIS)** department. The goal was to develop a real-time chat application as part of the course.  

@@ -1,5 +1,11 @@
 # ChatGPT Refactor Notes
 
+## 2026-07-11 - Database-backed application version policy
+
+- Added SQL entities, a migration, and seed data for Android, iOS, and PWA policies and ordered release notes.
+- Changed `GET /api/app-version` from configuration-backed evaluation to a database query.
+- Added cross-platform version-policy documentation.
+
 See UI changelog for frontend details.
 
 ## 2026-07-09 - Pinning and Kavenegar OTP

@@ -215,6 +215,67 @@ ConnectionError({ message, errorDetails })
 
 Routes use `[Route("api/[controller]/[action]")]` unless noted otherwise.
 
+### Application version policy
+
+Check this anonymous endpoint when Android starts and returns to the foreground. Integer build numbers—not display-version strings—control the decision.
+
+```http
+GET /api/app-version?platform=android&build=125&version=2.4.0&channel=production
+```
+
+```json
+{
+  "platform": "android",
+  "updateAvailable": true,
+  "updateType": "optional",
+  "current": { "version": "2.4.0", "build": 125 },
+  "latest": { "version": "2.5.0", "build": 130 },
+  "minimumSupported": { "version": "2.3.0", "build": 110 },
+  "title": "A new ChatNest version is available",
+  "message": "Update ChatNest to get the latest improvements and fixes.",
+  "releaseNotes": ["Improved chat performance"],
+  "storeUrl": "https://play.google.com/store/apps/details?id=ir.chatnest.app",
+  "remindAfterSeconds": 86400
+}
+```
+
+| `updateType` | Android behavior |
+|---|---|
+| `none` | Continue without UI. |
+| `optional` | Offer a dismissible Google Play flexible update and honor `remindAfterSeconds`. |
+| `required` | Show a non-dismissible screen and use Google Play immediate update. |
+| `maintenance` | Block navigation and let the user retry the policy request. |
+
+```kotlin
+data class AppBuildDto(val version: String, val build: Int)
+
+data class AppVersionResponse(
+    val platform: String,
+    val updateAvailable: Boolean,
+    val updateType: String,
+    val current: AppBuildDto,
+    val latest: AppBuildDto,
+    val minimumSupported: AppBuildDto,
+    val title: String,
+    val message: String,
+    val releaseNotes: List<String>,
+    val storeUrl: String,
+    val remindAfterSeconds: Int,
+)
+
+interface VersionApi {
+    @GET("api/app-version")
+    suspend fun appVersion(
+        @Query("platform") platform: String = "android",
+        @Query("build") build: Int = BuildConfig.VERSION_CODE,
+        @Query("version") version: String = BuildConfig.VERSION_NAME,
+        @Query("channel") channel: String = "production",
+    ): AppVersionResponse
+}
+```
+
+Policies and release notes come from the database. Do not hard-code latest or minimum builds in Android.
+
 ### Auth
 
 `POST /api/Auth/SignUp`

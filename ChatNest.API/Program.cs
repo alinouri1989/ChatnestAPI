@@ -179,6 +179,7 @@ try
     builder.Services.AddScoped<IGroupRepository, GroupRepository>();
     builder.Services.AddScoped<ICallRepository, CallRepository>();
     builder.Services.AddScoped<IMediaStorageRepository, EncryptedLocalMediaStorageRepository>();
+    builder.Services.AddScoped<IAppVersionPolicyRepository, AppVersionPolicyRepository>();
 
     // Register Services
     builder.Services.AddScoped<IAuthService, AuthService>();

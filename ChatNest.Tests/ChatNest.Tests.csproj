@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChatNest.API\ChatNest.API.csproj" />
     <ProjectReference Include="..\ChatNest.Services\ChatNest.Services.csproj" />
     <ProjectReference Include="..\ChatNest.Shared\ChatNest.Shared.csproj" />
   </ItemGroup>

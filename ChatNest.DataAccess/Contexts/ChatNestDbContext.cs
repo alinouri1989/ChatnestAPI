@@ -18,6 +18,8 @@ namespace ChatNest.DataAccess.Contexts
         public DbSet<Message> Messages { get; set; }
         public DbSet<Group> Groups { get; set; }
         public DbSet<Call> Calls { get; set; }
+        public DbSet<AppVersionPolicy> AppVersionPolicies { get; set; }
+        public DbSet<AppVersionReleaseNote> AppVersionReleaseNotes { get; set; }
 
         // Add junction table DbSets
         public DbSet<CallParticipant> CallParticipants { get; set; }
@@ -174,6 +176,44 @@ namespace ChatNest.DataAccess.Contexts
                       .OnDelete(DeleteBehavior.Cascade);
             });
 
+            modelBuilder.Entity<AppVersionPolicy>(entity =>
+            {
+                entity.ToTable("AppVersionPolicies");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Platform).IsRequired().HasMaxLength(20);
+                entity.Property(e => e.Channel).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.LatestVersion).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.MinimumSupportedVersion).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Message).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.StoreUrl).IsRequired().HasMaxLength(2048);
+                entity.HasIndex(e => new { e.Platform, e.Channel }).IsUnique();
+
+                entity.HasMany(e => e.ReleaseNotes)
+                      .WithOne(e => e.AppVersionPolicy)
+                      .HasForeignKey(e => e.AppVersionPolicyId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasData(
+                    CreateVersionPolicy(1, "android", "https://play.google.com/store/apps/details?id=ir.chatnest.app"),
+                    CreateVersionPolicy(2, "ios", "https://apps.apple.com/app/chatnest/id0000000000"),
+                    CreateVersionPolicy(3, "pwa", "https://app.chatnest.ir"));
+            });
+
+            modelBuilder.Entity<AppVersionReleaseNote>(entity =>
+            {
+                entity.ToTable("AppVersionReleaseNotes");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Text).IsRequired().HasMaxLength(500);
+                entity.HasIndex(e => new { e.AppVersionPolicyId, e.DisplayOrder }).IsUnique();
+                entity.HasData(
+                    new AppVersionReleaseNote { Id = 1, AppVersionPolicyId = 1, DisplayOrder = 1, Text = "Improved chat performance" },
+                    new AppVersionReleaseNote { Id = 2, AppVersionPolicyId = 1, DisplayOrder = 2, Text = "Fixed notification problems" },
+                    new AppVersionReleaseNote { Id = 3, AppVersionPolicyId = 1, DisplayOrder = 3, Text = "Improved application security" },
+                    new AppVersionReleaseNote { Id = 4, AppVersionPolicyId = 2, DisplayOrder = 1, Text = "Improved chat performance" },
+                    new AppVersionReleaseNote { Id = 5, AppVersionPolicyId = 3, DisplayOrder = 1, Text = "Improved chat performance" });
+            });
+
             // Configure CallParticipant junction table
             modelBuilder.Entity<CallParticipant>(entity =>
             {
@@ -257,5 +297,23 @@ namespace ChatNest.DataAccess.Contexts
                 await SaveChangesAsync();
             }
         }
+
+        private static AppVersionPolicy CreateVersionPolicy(int id, string platform, string storeUrl) => new()
+        {
+            Id = id,
+            Platform = platform,
+            Channel = "production",
+            LatestVersion = "2.5.0",
+            LatestBuild = 130,
+            MinimumSupportedVersion = "2.3.0",
+            MinimumSupportedBuild = 110,
+            Maintenance = false,
+            Title = "A new ChatNest version is available",
+            Message = platform == "pwa"
+                ? "Reload ChatNest to use the latest version."
+                : "Update ChatNest to get the latest improvements and fixes.",
+            StoreUrl = storeUrl,
+            RemindAfterSeconds = 86400
+        };
     }
 }
