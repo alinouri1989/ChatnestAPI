@@ -183,7 +183,7 @@ try
 
     // Register Services
     builder.Services.AddScoped<IAuthService, AuthService>();
-    builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+    builder.Services.AddHttpClient<IEmailService, RestEmailService>();
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddScoped<IChatService, ChatService>();
     builder.Services.AddScoped<IMessageService, MessageService>();

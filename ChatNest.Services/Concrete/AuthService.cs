@@ -366,16 +366,12 @@ namespace ChatNest.Services.Concrete
 
         private Task SendEmailOtpAsync(string email, string code)
         {
-            var htmlBody = $"""
-                <div style="font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right;line-height:1.8">
-                    <h2>کد ورود ChatNest</h2>
-                    <p>برای ورود به حساب خود از کد زیر استفاده کنید:</p>
-                    <p style="font-size:24px;font-weight:700;letter-spacing:4px;direction:ltr;text-align:center">{code}</p>
-                    <p>اگر شما این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.</p>
-                </div>
-                """;
-
-            return _emailService.SendEmailAsync(email, "کد ورود ChatNest", htmlBody);
+            return _emailService.SendEmailAsync(email, new Dictionary<string, string>
+            {
+                ["otp"] = code,
+                ["app_name"] = "ChatNest",
+                ["expires_minutes"] = GetOtpExpiryMinutes().ToString(CultureInfo.InvariantCulture)
+            });
         }
 
         private static string BuildOtpCacheKey(string mobile) => $"login-otp:{mobile}";
@@ -447,24 +443,14 @@ namespace ChatNest.Services.Concrete
                     resetPath,
                     resetUrl.Length);
 
-                var htmlBody = $"""
-                    <div style="font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right;line-height:1.8">
-                        <h2>بازیابی رمز عبور ChatNest</h2>
-                        <p>برای تنظیم رمز عبور جدید، روی دکمه زیر کلیک کنید:</p>
-                        <p>
-                            <a href="{resetUrl}" style="background:#0f6fff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;display:inline-block">
-                                بازیابی رمز عبور
-                            </a>
-                        </p>
-                        <p>اگر شما این درخواست را ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.</p>
-                        <p style="font-size:12px;color:#666">لینک مستقیم: {resetUrl}</p>
-                    </div>
-                    """;
-
                 _logger.LogInformation("Calling email service for password reset. To={Email}", email);
                 try
                 {
-                    await _emailService.SendEmailAsync(email, "بازیابی رمز عبور ChatNest", htmlBody);
+                    await _emailService.SendEmailAsync(email, new Dictionary<string, string>
+                    {
+                        ["reset_url"] = resetUrl,
+                        ["app_name"] = "ChatNest"
+                    });
                     _logger.LogInformation("Password reset email flow completed for {Email}", email);
                 }
                 catch (Exception ex)
