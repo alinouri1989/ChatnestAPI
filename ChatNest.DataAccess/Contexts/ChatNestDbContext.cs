@@ -197,7 +197,14 @@ namespace ChatNest.DataAccess.Contexts
                 entity.HasData(
                     CreateVersionPolicy(1, "android", "https://play.google.com/store/apps/details?id=ir.chatnest.app"),
                     CreateVersionPolicy(2, "ios", "https://apps.apple.com/app/chatnest/id0000000000"),
-                    CreateVersionPolicy(3, "pwa", "https://app.chatnest.ir"));
+                    CreateVersionPolicy(
+                        3,
+                        "pwa",
+                        "https://app.chatnest.ir",
+                        latestVersion: "2.6.1",
+                        latestBuild: 132,
+                        title: "نسخه جدید چت‌نست آماده است",
+                        message: "برای استفاده از آخرین بهبودها و رفع اشکال‌ها، برنامه را به‌روزرسانی کنید."));
             });
 
             modelBuilder.Entity<AppVersionReleaseNote>(entity =>
@@ -298,20 +305,25 @@ namespace ChatNest.DataAccess.Contexts
             }
         }
 
-        private static AppVersionPolicy CreateVersionPolicy(int id, string platform, string storeUrl) => new()
+        private static AppVersionPolicy CreateVersionPolicy(
+            int id,
+            string platform,
+            string storeUrl,
+            string latestVersion = "2.5.0",
+            int latestBuild = 130,
+            string? title = null,
+            string? message = null) => new()
         {
             Id = id,
             Platform = platform,
             Channel = "production",
-            LatestVersion = "2.5.0",
-            LatestBuild = 130,
+            LatestVersion = latestVersion,
+            LatestBuild = latestBuild,
             MinimumSupportedVersion = "2.3.0",
             MinimumSupportedBuild = 110,
             Maintenance = false,
-            Title = "A new ChatNest version is available",
-            Message = platform == "pwa"
-                ? "Reload ChatNest to use the latest version."
-                : "Update ChatNest to get the latest improvements and fixes.",
+            Title = title ?? "A new ChatNest version is available",
+            Message = message ?? "Update ChatNest to get the latest improvements and fixes.",
             StoreUrl = storeUrl,
             RemindAfterSeconds = 86400
         };
