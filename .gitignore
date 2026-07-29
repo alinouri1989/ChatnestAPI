@@ -362,3 +362,13 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /_tmp_build_out
+# Local and production secrets
+**/appsettings.Secrets.json
+**/appsettings.Local.json
+**/*service-account*.json
+**/*google-credentials*.json
+**/firebase-service-account.json
+secrets/
+Secrets/
+.env
+.env.*
